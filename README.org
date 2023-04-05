@@ -1,0 +1,58 @@
+* tray-builder
+
+Helpers for generating transient prefixes.
+
+** Installation
+
+Emacs >= 27.1 is required.
+
+*** Manual
+
+Ensure that you have installed required dependencies:
+- ~transient~
+
+Download the source code and put it wherever you like, e.g. into =~/.emacs.d/tray-builder/=
+
+#+begin_src shell :eval no
+git clone https://github.com/KarimAziev/tray-builder.git ~/.emacs.d/tray-builder/
+#+end_src
+
+Add the downloaded directory to the load path:
+
+#+begin_src elisp :eval no
+(add-to-list 'load-path "~/.emacs.d/tray-builder/")
+(require 'tray-builder)
+#+end_src
+
+#+begin_src elisp :eval no
+(use-package tray-builder
+  :straight (tray-builder
+             :repo "KarimAziev/tray-builder"
+             :type git
+             :host github))
+#+end_src
+
+** Transient
+
+-  ~tray-builder-menu~
+Generate transient prefixes from region or with commands.
+** Commands
+
+-  ~tray-builder-eval-local-commands-prefix~
+Eval and call transient prefix with active minor commands.
+-  ~tray-builder-eval-all-active-modes-commands~
+Dispatch local commands with short keys.
+-  ~tray-builder-eval-toggle-minor-mode-prefix~
+Generate and call transient prefix with all minor modes.
+-  ~tray-builder-kill-from-region-lines~  (&optional beg end)
+Generate body for transient prefix from region lines between =beg= and =end=.
+-  ~tray-builder-kill-from-active-minor-modes~
+Copy body for =transient-define-prefix= from currently active minor modes.
+-  ~tray-builder-kill-from-minor-modes~
+Copy body for =transient-define-prefix= from all minor modes.
+-  ~tray-builder-kill-commands-from-keymap~  (keymap)
+Generate transient body from =keymap=.
+-  ~tray-builder-kill-from-commands~  (commands)
+Generate transient body from =commands=.
+-  ~tray-builder-hydra-to-transient~  (begin end)
+Copy region with hydra heads between =begin= and =end= as transient commands.
