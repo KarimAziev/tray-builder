@@ -404,7 +404,6 @@ Return new position if changed, nil otherwise."
     (or (seq-find
          pred
          (remove parts "-"))
-        (append flag)
         (seq-find pred parts)
         (seq-find pred
                   (seq-difference
