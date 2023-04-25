@@ -222,6 +222,7 @@ vector suitable for `key-description', and COMMAND is a smbol."
    (ignore-errors
      (key-description (vector key)))))
 
+
 (defun tray-builder-keymap-keys-to-alist (keymap &optional filter)
   "Map KEYMAP to alist with FILTER function.
 FILTER function will be called with two arguments - key description and value."
@@ -422,6 +423,17 @@ Return new position if changed, nil otherwise."
                    used-keys))
         "")))
 
+
+(defun tray-builder-shorten-key-description (binding)
+  "Return short version of BINDING."
+  (when-let* ((parts
+               (unless (string-match-p "mouse" binding)
+                 (split-string binding nil t))))
+    (let ((str (car (reverse parts))))
+      (if (key-valid-p (car (reverse (split-string str "-" t))))
+          (car (reverse (split-string str "-" t)))
+        binding))))
+
 (defun tray-builder-commands-alist-to-transient (commands)
   "Generate transient body from COMMANDS.
 COMMANDS should be either list of symbols,
@@ -439,7 +451,14 @@ or alist of keys and symbols."
                                                       (cdr line))))))
                   (key (if (and (stringp (car-safe line))
                                 (key-valid-p (car line)))
-                           (car line)
+                           (when-let
+                               ((short
+                                 (tray-builder-shorten-key-description
+                                  (car
+                                   line))))
+                             (if (and short (not (member short used-keys)))
+                                 short
+                               (car line)))
                          (let* ((name (symbol-name symb))
                                 (words (reverse (split-string name
                                                               "-"
@@ -462,25 +481,26 @@ or alist of keys and symbols."
                               used-keys)))))
                   (doc (if (proper-list-p line)
                            (seq-find #'stringp (remove key line))
-                         (or (when-let* ((doc-str (ignore-errors (documentation
-                                                                  symb)))
-                                         (parts (split-string (replace-regexp-in-string
-                                                               "[.][\s\t]?+$" ""
-                                                               (car (split-string
-                                                                     (substring-no-properties
-                                                                      doc-str)
-                                                                     "\n" t)))
-                                                              nil t)))
-                               (let ((case-fold-search nil))
-                                 (mapconcat
-                                  (lambda (it)
-                                    (if (and (string-match-p "[A-ZZ-A]" it)
-                                             (not (string-match-p "[a-z]" it))
-                                             (> (length it) 1))
-                                        (downcase it)
-                                      it))
-                                  parts "\s")))
-                             (symbol-name symb)))))
+                         (or
+                          (when-let* ((doc-str (ignore-errors (documentation
+                                                               symb)))
+                                      (parts (split-string (replace-regexp-in-string
+                                                            "[.][\s\t]?+$" ""
+                                                            (car (split-string
+                                                                  (substring-no-properties
+                                                                   doc-str)
+                                                                  "\n" t)))
+                                                           nil t)))
+                            (let ((case-fold-search nil))
+                              (mapconcat
+                               (lambda (it)
+                                 (if (and (string-match-p "[A-ZZ-A]" it)
+                                          (not (string-match-p "[a-z]" it))
+                                          (> (length it) 1))
+                                     (downcase it)
+                                   it))
+                               parts "\s")))
+                          (symbol-name symb)))))
         (push key used-keys)
         (if (and tray-builder-transient-doc-regexp-words
                  (seq-find (lambda (i)
@@ -492,7 +512,7 @@ or alist of keys and symbols."
                            (list symb doc)))
             (push (list key doc symb :transient t) result)
           (push (list key doc symb) result))))
-    (reverse result)))
+    (delete-dups (reverse result))))
 
 (defun tray-builder-read-description (fn)
   "Read description for FN."
@@ -714,6 +734,7 @@ If ACTIVE is non nil, use only active modes."
                                                             it)))))
                          (tray-builder-format-keymap-to-alist
                           (current-local-map))))))))
+
 
 (defun tray-builder-get-minor-modes-commands (&optional active)
   "Generate prefixes from `minor-mode-map-alist'.
