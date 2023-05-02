@@ -3,10 +3,11 @@
 ;; Copyright (C) 2022 Karim Aziiev <karim.aziiev@gmail.com>
 
 ;; Author: Karim Aziiev <karim.aziiev@gmail.com>
-;; URL: https://github.com/KarimAziev/ohai-emacs
+;; URL: https://github.com/KarimAziev/tray-builder
 ;; Keywords: lisp
 ;; Version: 0.1.1
 ;; Package-Requires: ((emacs "27.1") (transient "0.3.7.50-git"))
+;; SPDX-License-Identifier: GPL-3.0-or-later
 
 ;; This file is NOT part of GNU Emacs.
 
@@ -46,6 +47,37 @@
   "List of words to indicate that generated commmand shouldn't exit transient."
   :type '(repeat string)
   :group 'tray-builder)
+
+(defun tray-builder-fontify (content &optional mode-fn &rest args)
+  "Fontify CONTENT according to MODE-FN called with ARGS.
+If CONTENT is not a string, instead of MODE-FN emacs-lisp-mode will be used."
+  (with-temp-buffer
+    (delay-mode-hooks
+      (apply (or mode-fn 'emacs-lisp-mode) args)
+      (goto-char (point-min))
+      (insert (if (or (eq major-mode 'emacs-lisp-mode)
+                      (not (stringp content)))
+                  (pp-to-string content)
+                content))
+      (font-lock-ensure)
+      (buffer-string))))
+
+(defun tray-builder-copy-as-string (result)
+  "Copy RESULT according to MODE-FN called with ARGS.
+If RESULT is not a string, instead of MODE-FN emacs-lisp-mode will be used."
+  (let ((content (tray-builder-prettify-vector result)))
+    (kill-new content)
+    (message content)
+    content))
+
+(defun tray-builder-preview (result)
+  "Copy RESULT according to MODE-FN called with ARGS.
+If RESULT is not a string, instead of MODE-FN emacs-lisp-mode will be used."
+  (let ((content (tray-builder-fontify result)))
+    (momentary-string-display content (save-excursion
+                                        (forward-line)
+                                        (point)))))
+
 
 (defun tray-builder-group-with (fn items &optional transform-fn)
   "Group ITEMS by calling FN with every item.
@@ -222,7 +254,6 @@ vector suitable for `key-description', and COMMAND is a smbol."
    (ignore-errors
      (key-description (vector key)))))
 
-
 (defun tray-builder-keymap-keys-to-alist (keymap &optional filter)
   "Map KEYMAP to alist with FILTER function.
 FILTER function will be called with two arguments - key description and value."
@@ -254,18 +285,19 @@ FILTER function will be called with two arguments - key description and value."
 (defun tray-builder-format-keymap-to-alist (keymap &optional symb-prefix)
   "Convert KEYMAP to alist and filter by SYMB-PREFIX."
   (when (keymapp keymap)
-    (if-let ((name (when symb-prefix
-                     (car
-                      (split-string (if (symbolp symb-prefix)
-                                        (symbol-name symb-prefix)
-                                      symb-prefix)
-                                    "-" t)))))
+    (if-let ((name
+              (when symb-prefix
+                (car
+                 (split-string (if (symbolp symb-prefix)
+                                   (symbol-name symb-prefix)
+                                 symb-prefix)
+                               "-" t)))))
         (tray-builder-keymap-keys-to-alist keymap
-                                             (lambda (_k v)
-                                               (and (symbolp v)
-                                                    (string-prefix-p name
-                                                                     (symbol-name
-                                                                      v)))))
+                                           (lambda (_k v)
+                                             (and (symbolp v)
+                                                  (string-prefix-p name
+                                                                   (symbol-name
+                                                                    v)))))
       (tray-builder-keymap-keys-to-alist keymap))))
 
 (defun tray-builder-shortcut-pred (used-keys key)
@@ -324,7 +356,7 @@ Return new position if changed, nil otherwise."
     (reverse cands)))
 
 (defun tray-builder-get-all-key-strategies (word len)
-  "Generate preffered keybinding from WORD with length LEN."
+  "Generate preffered shortcut from WORD with length LEN."
   (let* ((parts (append (split-string word "[^a-zz-a]" t)
                         (list (replace-regexp-in-string "[^a-zz-a]" "" word))))
          (parts-len (length parts))
@@ -346,57 +378,91 @@ Return new position if changed, nil otherwise."
              ((member it vars)
               -1)
              (t (length (tray-builder-shared-start word it)))))
-     '>
+     #'>
      (seq-uniq (append
                 vars
                 (mapcar
                  (lambda (n)
-                   (funcall finalize (mapconcat (apply-partially
-                                                 'tray-builder-safe-substring n)
-                                                parts)))
+                   (funcall finalize (mapconcat
+                                      (apply-partially
+                                       #'tray-builder-safe-substring n)
+                                      parts)))
                  (number-sequence 1 (min len parts-len)))
                 (mapcar
                  (lambda (n)
-                   (funcall finalize (mapconcat (apply-partially
-                                                 'tray-builder-safe-substring n)
-                                                (reverse parts))))
+                   (funcall finalize (mapconcat
+                                      (apply-partially
+                                       #'tray-builder-safe-substring n)
+                                      (reverse parts))))
                  (number-sequence 1 (min len parts-len))))))))
 
-(defun tray-builder-generate-shortcuts (words max-len)
-  "Generate shortcuts from WORDS with a given MAX-LEN."
-  (let ((shortcuts '())
-        (used '())
-        (result))
-    (dolist (sym words)
-      (let ((word (if (symbolp sym)
-                      (symbol-name sym)
-                    sym)))
-        (when (not (member word used))
-          (let ((short
-                 (downcase
-                  (substring-no-properties word 0
-                                           (min (1+ max-len)
-                                                (length word))))))
-            (setq short (replace-regexp-in-string "[^a-z]" "" short))
-            (setq short
-                  (seq-find (lambda (it)
-                              (not (member it shortcuts)))
-                            (tray-builder-get-all-key-strategies word
-                                                                 (1+
-                                                                  max-len))))
-            (while (and (member short shortcuts))
-              (setq short (if (<= (length short) max-len)
-                              (upcase
-                               (substring-no-properties word 0 (min (1+
-                                                                     max-len)
-                                                                    (length
-                                                                     word))))
-                            (concat short (number-to-string (random 10))))))
-            (push short shortcuts)
+(defun tray-builder-generate-shortcuts (items &optional key-fn value-fn)
+  "Generate shortcuts from list of ITEMS.
+If KEY-FN is nil, ITEMS should be list of strings or symbols.
+If KEY-FN is a function, it will be called with every item of list, and should
+return string that will be as basis for shortcut.
+If VALUE-FN is nil, result is an alist of generated keys and corresponding
+items.
+If VALUE-FN is non nil, return a list of results of calling VALUE-FN with two
+arguments - generated shortcut and item."
+  (let* ((total (length items))
+         (random-variants (append
+                           (mapcar #'char-to-string
+                                   (number-sequence (string-to-char
+                                                     "a")
+                                                    (string-to-char
+                                                     "z")))
+                           (mapcar #'char-to-string
+                                   (number-sequence (string-to-char
+                                                     "A")
+                                                    (string-to-char
+                                                     "Z")))
+                           (mapcar #'number-to-string (number-sequence 0 9))))
+         (variants-len (length random-variants))
+         (min-len
+          (cond ((>= variants-len total)
+                 1)
+                ((>= variants-len (/ total 2))
+                 2)
+                (t 3))))
+    (let ((shortcuts '())
+          (used '())
+          (result))
+      (dotimes (i (length items))
+        (let* ((def (nth i items))
+               (word (if key-fn
+                         (funcall key-fn def)
+                       (if (symbolp def)
+                           (symbol-name def)
+                         def))))
+          (when (not (member word used))
             (push word used)
-            (push (cons short sym)
-                  result)))))
-    result))
+            (let ((short
+                   (downcase
+                    (substring-no-properties word 0
+                                             (min min-len
+                                                  (length word))))))
+              (setq short (replace-regexp-in-string "[^a-z]" "" short))
+              (setq short
+                    (seq-find
+                     (lambda (it)
+                       (not
+                        (seq-find (apply-partially
+                                   #'string-prefix-p it)
+                                  shortcuts)))
+                     (append (tray-builder-get-all-key-strategies word
+                                                                  min-len)
+                             (when (= min-len 1)
+                               random-variants))))
+              (while (and
+                      (< (length short) min-len))
+                (setq short (concat short (number-to-string (random 10)))))
+              (push short shortcuts)
+              (push (if value-fn
+                        (funcall value-fn short def)
+                      (cons short def))
+                    result)))))
+      (reverse result))))
 
 (defun tray-builder-generate-key (flag &optional used-keys)
   "Generate key for option FLAG that not present in USED-KEYS."
@@ -423,7 +489,6 @@ Return new position if changed, nil otherwise."
                    used-keys))
         "")))
 
-
 (defun tray-builder-shorten-key-description (binding)
   "Return short version of BINDING."
   (when-let* ((parts
@@ -434,12 +499,56 @@ Return new position if changed, nil otherwise."
           (car (reverse (split-string str "-" t)))
         binding))))
 
+(defun tray-builder-shorten-name (name shared-prefix)
+  "Trim SHARED-PREFIX from NAME."
+  (if (and shared-prefix
+           name
+           (and (string-prefix-p shared-prefix name)))
+      (replace-regexp-in-string "^[-]+\\|[-]$" ""
+                                (substring-no-properties name
+                                                         (length
+                                                          shared-prefix)))
+    name))
+
+(defun tray-builder-name-to-doc (name)
+  "Capitalize and remove all non alphapetical chars from NAME."
+  (capitalize (string-join (split-string name "[^a-zZ-A]+" t) " ")))
+
+(defun tray-builder-find-longest-prefix (strings)
+  "Return longest common prefix in STRINGS."
+  (setq strings (seq-sort-by #'length '> strings))
+  (seq-reduce (lambda (acc it)
+                (if-let ((shared (tray-builder-shared-start acc it)))
+                    (setq acc shared)
+                  acc))
+              strings (pop strings)))
+
 (defun tray-builder-commands-alist-to-transient (commands)
   "Generate transient body from COMMANDS.
 COMMANDS should be either list of symbols,
 or alist of keys and symbols."
   (let ((used-keys)
         (line)
+        (shared-prefix
+         (tray-builder-find-longest-prefix
+          (remove nil
+                  (mapcar
+                   (lambda (it)
+                     (when-let ((symb
+                                 (if (proper-list-p
+                                      it)
+                                     (seq-find
+                                      #'symbolp
+                                      it)
+                                   (seq-find
+                                    #'symbolp
+                                    (list
+                                     (car
+                                      it)
+                                     (cdr
+                                      it))))))
+                       (symbol-name symb)))
+                   commands))))
         (result))
     (while (setq line (pop commands))
       (when-let* ((symb (if (and line
@@ -451,18 +560,20 @@ or alist of keys and symbols."
                                                       (cdr line))))))
                   (key (if (and (stringp (car-safe line))
                                 (key-valid-p (car line)))
-                           (when-let
-                               ((short
-                                 (tray-builder-shorten-key-description
-                                  (car
-                                   line))))
+                           (when-let ((short
+                                       (tray-builder-shorten-key-description
+                                        (car
+                                         line))))
                              (if (and short (not (member short used-keys)))
                                  short
                                (car line)))
-                         (let* ((name (symbol-name symb))
-                                (words (reverse (split-string name
-                                                              "-"
-                                                              t)))
+                         (let* ((name (tray-builder-shorten-name (symbol-name
+                                                                  symb)
+                                                                 shared-prefix))
+                                (words (remove "mode"
+                                               (reverse (split-string name
+                                                                      "-"
+                                                                      t))))
                                 (found (seq-find
                                         (lambda (it)
                                           (let ((wk (substring-no-properties
@@ -479,28 +590,29 @@ or alist of keys and symbols."
                              (tray-builder-generate-key
                               name
                               used-keys)))))
-                  (doc (if (proper-list-p line)
-                           (seq-find #'stringp (remove key line))
-                         (or
-                          (when-let* ((doc-str (ignore-errors (documentation
-                                                               symb)))
-                                      (parts (split-string (replace-regexp-in-string
-                                                            "[.][\s\t]?+$" ""
-                                                            (car (split-string
-                                                                  (substring-no-properties
-                                                                   doc-str)
-                                                                  "\n" t)))
-                                                           nil t)))
-                            (let ((case-fold-search nil))
-                              (mapconcat
-                               (lambda (it)
-                                 (if (and (string-match-p "[A-ZZ-A]" it)
-                                          (not (string-match-p "[a-z]" it))
-                                          (> (length it) 1))
-                                     (downcase it)
-                                   it))
-                               parts "\s")))
-                          (symbol-name symb)))))
+                  (doc (or (if (proper-list-p line)
+                               (seq-find #'stringp (remove key line))
+                             (when-let* ((doc-str (ignore-errors (documentation
+                                                                  symb)))
+                                         (parts (split-string (replace-regexp-in-string
+                                                               "[.][\s\t]?+$" ""
+                                                               (car (split-string
+                                                                     (substring-no-properties
+                                                                      doc-str)
+                                                                     "\n" t)))
+                                                              nil t)))
+                               (let ((case-fold-search nil))
+                                 (mapconcat
+                                  (lambda (it)
+                                    (if (and (string-match-p "[A-ZZ-A]" it)
+                                             (not (string-match-p "[a-z]" it))
+                                             (> (length it) 1))
+                                        (downcase it)
+                                      it))
+                                  parts "\s"))))
+                           (tray-builder-name-to-doc
+                            (tray-builder-shorten-name (symbol-name symb)
+                                                       shared-prefix)))))
         (push key used-keys)
         (if (and tray-builder-transient-doc-regexp-words
                  (seq-find (lambda (i)
@@ -553,13 +665,14 @@ or alist of keys and symbols."
                                          (str (pop item)))
                                     (list
                                      (key-description key)
-                                     (or (when (stringp str)
-                                           str)
-                                         (if (symbolp fn)
-                                             (tray-builder-read-description fn)
-                                           (read-string (concat (format
-                                                                 "Name for (key %s) "
-                                                                 key)))))
+                                     (or
+                                      (when (stringp str)
+                                        str)
+                                      (if (symbolp fn)
+                                          (tray-builder-read-description fn)
+                                        (read-string (concat (format
+                                                              "Name for (key %s) "
+                                                              key)))))
                                      (cond ((and (listp fn)
                                                  (not (eq 'lambda (car-safe fn))))
                                             `(lambda ()
@@ -570,7 +683,6 @@ or alist of keys and symbols."
     (kill-new (prin1-to-string result))
     (message "Copied")
     result))
-
 
 (defun tray-builder-parse-line (line-string)
   "Try to extract key, command and description from LINE-STRING."
@@ -594,36 +706,37 @@ or alist of keys and symbols."
             (seq-find (apply-partially #'string-match-p
                                        "\\(?:\\sw\\|\\s_\\|\\\\.\\)+")
                       (seq-sort-by #'length '> (remove key parts))))
-           (symb (when fn
-                   (intern fn)))
-           (doc (when fn
-                  (or
-                   (when-let* ((doc-str (ignore-errors (documentation
-                                                        symb)))
-                               (parts (split-string (replace-regexp-in-string
-                                                     "[.][\s\t]?+$" ""
-                                                     (car (split-string
-                                                           (substring-no-properties
-                                                            doc-str)
-                                                           "\n" t)))
-                                                    nil t)))
-                     (let ((case-fold-search nil))
-                       (mapconcat
-                        (lambda (it)
-                          (if (and (string-match-p "[A-ZZ-A]" it)
-                                   (not (string-match-p "[a-z]" it))
-                                   (> (length it) 1))
-                              (downcase it)
-                            it))
-                        parts "\s")))
-                   (when-let ((rest (remove fn (remove key parts))))
-                     (string-join rest " "))
-                   fn))))
+           (symb
+            (when fn
+              (intern fn)))
+           (doc
+            (when fn
+              (or
+               (when-let* ((doc-str (ignore-errors (documentation
+                                                    symb)))
+                           (parts (split-string (replace-regexp-in-string
+                                                 "[.][\s\t]?+$" ""
+                                                 (car (split-string
+                                                       (substring-no-properties
+                                                        doc-str)
+                                                       "\n" t)))
+                                                nil t)))
+                 (let ((case-fold-search nil))
+                   (mapconcat
+                    (lambda (it)
+                      (if (and (string-match-p "[A-ZZ-A]" it)
+                               (not (string-match-p "[a-z]" it))
+                               (> (length it) 1))
+                          (downcase it)
+                        it))
+                    parts "\s")))
+               (when-let ((rest (remove fn (remove key parts))))
+                 (string-join rest " "))
+               fn))))
       (when symb
         (list key
               doc
               symb)))))
-
 
 (defun tray-builder-prettify-vector (result)
   "Return pretty string for vector RESULT."
@@ -638,14 +751,14 @@ or alist of keys and symbols."
       (when (and (looking-back "[)]" 0)
                  (not (looking-at "[\s\t\n]?+\\]" 0)))
         (newline-and-indent)))
-    (buffer-substring-no-properties (point-min)
-                                    (point-max))))
+    (font-lock-ensure)
+    (buffer-string)))
 
 (defun tray-builder-prettify-vectors (vectors)
   "Return pretty string from VECTORS."
   (if (seq-find #'vectorp (if (listp vectors)
-                             vectors
-                           (append vectors nil)))
+                              vectors
+                            (append vectors nil)))
       (let ((strs))
         (dolist (vect (if (listp vectors)
                           vectors
@@ -658,11 +771,12 @@ or alist of keys and symbols."
 
 (defun tray-builder--from-region-lines (beg end)
   "Generate body for transient prefix from region between BEG and END."
-  (when-let* ((lines (when (and beg end)
-                       (split-string (buffer-substring-no-properties
-                                      beg
-                                      end)
-                                     "[\n]" t)))
+  (when-let* ((lines
+               (when (and beg end)
+                 (split-string (buffer-substring-no-properties
+                                beg
+                                end)
+                               "[\n]" t)))
               (splitted (remove nil
                                 (mapcar
                                  #'tray-builder-parse-line
@@ -695,10 +809,41 @@ or alist of keys and symbols."
           (push key used-keys)
           (setcar line key)
           (push line result)))
-      (setq result (apply #'vector (reverse
-                                    result)))
-      (tray-builder-prettify-vector result))))
+      (apply #'vector (reverse
+                       result)))))
 
+(defun tray-builder--alistp (list)
+  "Return T if LIST is an association list."
+  (and (proper-list-p list)
+       (seq-every-p #'consp list)))
+
+(defun tray-builder-read-top-level-lists ()
+  "Return all Lisp lists at outermost position in current buffer.
+An \"outermost position\" means one that it is outside of any syntactic entity:
+outside of any parentheses, comments, or strings encountered in the scan."
+  (let ((sexps)
+        (sexp))
+    (goto-char (point-min))
+    (while (setq sexp (ignore-errors (read (current-buffer))))
+      (push sexp sexps))
+    (reverse sexps)))
+
+(defun tray-builder--from-region (beg end)
+  "Generate body for transient prefix from region between BEG and END."
+  (let* ((sexps (save-excursion
+                  (save-restriction
+                    (narrow-to-region beg end)
+                    (tray-builder-read-top-level-lists))))
+         (result
+          (pcase sexps
+            ((pred tray-builder--alistp)
+             (apply #'vector (tray-builder-commands-alist-to-transient sexps)))
+            ((guard (tray-builder--alistp (car-safe sexps)))
+             (apply #'vector
+                    (tray-builder-commands-alist-to-transient (car-safe sexps))))
+            (_ (tray-builder--from-region-lines beg end)))))
+    (tray-builder-copy-as-string
+     result)))
 
 (defun tray-builder-get-all-minor-modes-short-commands (&optional active)
   "Return commands from minor modes with short keybindings.
@@ -735,7 +880,6 @@ If ACTIVE is non nil, use only active modes."
                          (tray-builder-format-keymap-to-alist
                           (current-local-map))))))))
 
-
 (defun tray-builder-get-minor-modes-commands (&optional active)
   "Generate prefixes from `minor-mode-map-alist'.
 If ACTIVE is non nil, return bodies only for active modes."
@@ -765,14 +909,14 @@ If ACTIVE is non nil, return bodies only for active modes."
 ;;;###autoload
 (defun tray-builder-kill-from-commands (commands)
   "Generate transient body from COMMANDS."
-  (interactive (list (mapcar 'intern (completing-read-multiple
-                                      "Command "
-                                      (let (maps)
-                                        (mapatoms (lambda (sym)
-                                                    (and (fboundp sym)
-                                                         (commandp sym)
-                                                         (push sym maps))))
-                                        maps)))))
+  (interactive (list (mapcar #'intern (completing-read-multiple
+                                       "Command "
+                                       (let (maps)
+                                         (mapatoms (lambda (sym)
+                                                     (and (fboundp sym)
+                                                          (commandp sym)
+                                                          (push sym maps))))
+                                         maps)))))
   (if-let ((commands (tray-builder-commands-alist-to-transient
                       commands)))
       (progn (kill-new (tray-builder-prettify-vectors commands))
@@ -820,18 +964,18 @@ If ACTIVE is non nil, return bodies only for active modes."
 (defun tray-builder-kill-from-region-lines (&optional beg end)
   "Generate body for transient prefix from region lines between BEG and END."
   (interactive "r")
-  (if-let ((string-result (tray-builder--from-region-lines
-                           (or
-                            beg
-                            (region-beginning))
-                           (or end (region-end)))))
-      (progn (kill-new string-result)
-             (momentary-string-display string-result
-                                       (point)
-                                       nil
-                                       "Copied transient commands"))
-    (message "No active region")))
+  (tray-builder--from-region
+   (or
+    beg
+    (region-beginning))
+   (or end (region-end))))
 
+(defun tray-builder-transient-make-toggled-description-creator (mode &optional
+                                                                     description)
+  "Concat DESCRIPTION for MODE with colorized suffixes ON-LABEL and OFF-LABEL."
+  (lambda (&optional align)
+    (tray-builder-transient-make-toggled-description mode description
+                                                     (or align 40))))
 
 (defun tray-builder-transient-make-toggled-description (mode &optional
                                                              description align)
@@ -840,8 +984,6 @@ If ACTIVE is non nil, return bodies only for active modes."
     (let ((mode mode)
           (description description)
           (align align))
-      (setq align (or align (when description (1+ (length description)))
-                      40))
       (concat
        (propertize
         (or
@@ -857,7 +999,9 @@ If ACTIVE is non nil, return bodies only for active modes."
                                                                   doc
                                                                   "\n"
                                                                   nil))))
-            align
+            (or align
+                (when description (1+ (length description)))
+                40)
             nil nil
             1)))
         'face
@@ -865,8 +1009,10 @@ If ACTIVE is non nil, return bodies only for active modes."
             (and (boundp mode)
                  (symbol-value mode))
             'success nil))
-       (propertize " " 'display
-                   (list 'space :align-to align))
+       (if align
+           (propertize " " 'display
+                       (list 'space :align-to align))
+         " ")
        (if (and (boundp mode)
                 (symbol-value mode))
            "[X]" "[ ]")))))
@@ -885,57 +1031,75 @@ If ACTIVE is non nil, return bodies only for active modes."
 (defun tray-builder-eval-toggle-minor-mode-prefix ()
   "Generate and call transient prefix with all minor modes."
   (interactive)
-  (let* ((all-modes (tray-builder-generate-shortcuts
-                     (remove nil
-                             (mapcar
-                              (lambda (mode)
-                                (when (and (boundp mode)
-                                           (commandp mode))
-                                  mode))
-                              minor-mode-list))
-                     2))
-         (max-len (+ 10 (apply 'max
-                               (mapcar (lambda (it)
-                                         (string-width (symbol-name
-                                                        (cdr it))))
-                                       all-modes))))
-         (len (/ (length all-modes) 2))
-         (heads))
-    (setq all-modes (mapcan 'cdr
-                            (tray-builder-group-with (lambda (it)
-                                                       (car (split-string
-                                                             (symbol-name
-                                                              (cdr
-                                                               it))
-                                                             "-"
-                                                             t)))
-                                                     all-modes)))
-    (dotimes (idx (length all-modes))
-      (let* ((cell (nth idx all-modes))
-             (mode (cdr cell))
-             (key (car cell)))
-        (push (list
-               key
-               mode
-               :description
-               (tray-builder-transient-make-toggled-description
-                mode
-                nil
-                (if (>= idx len)
-                    (* max-len 2)
-                  max-len)))
-              heads)))
-    (setq heads (reverse heads))
-    (setq heads (mapcar (lambda (it)
-                          (apply 'vector it))
-                        (seq-split heads (/ (length heads) 2))))
-    (eval `(progn (transient-define-prefix
-                    tray-builder--toggle-minor-mode ()
-                    :transient-non-suffix 'transient--do-stay
-                    :transient-suffix
-                    'transient--do-call
-                    ,(apply 'vector heads))
-                  (tray-builder--toggle-minor-mode)))))
+  (let* ((maxwidth
+          (min (length
+                (car
+                 (seq-sort-by #'length '> (mapcar #'symbol-name
+                                                 minor-mode-list))))
+               (window-width)))
+         (all-modes
+          (tray-builder-generate-shortcuts
+           (remove nil
+                   (mapcar
+                    (lambda (mode)
+                      (when (and (boundp mode)
+                                 (commandp mode))
+                        mode))
+                    minor-mode-list))
+           'symbol-name
+           (lambda (key mode)
+             (list
+              key
+              mode
+              :description
+              `(lambda ()
+                 (let* ((mode ',mode)
+                        (doc (truncate-string-to-width
+                              (replace-regexp-in-string
+                               "\\_<\\(Mode\\)\\_>"
+                               ""
+                               (if-let ((doc (replace-regexp-in-string
+                                              "-" " " (capitalize (symbol-name
+                                                                   mode)))))
+                                   (replace-regexp-in-string "^Toggle[\s]" ""
+                                                             (replace-regexp-in-string
+                                                              "\\.$" ""
+                                                              (car
+                                                               (split-string
+                                                                doc
+                                                                "\n"
+                                                                nil))))
+                                 (symbol-name mode)))
+                              ,maxwidth
+                              nil nil
+                              1)))
+                   (if (and (boundp mode)
+                            (symbol-value mode))
+                       (propertize doc 'face 'success)
+                     doc)))))))
+         (count (length all-modes))
+         (height (- (window-height) 10))
+         (cols (max (if (and (> height 0)
+                             (> count height))
+                        (/ count height)
+                      (/ (window-width) maxwidth))
+                    1))
+         (heads (if
+                    (> (/ count cols) 1)
+                    (mapcar
+                     (lambda (it)
+                       (apply #'vector it))
+                     (seq-split all-modes (/ count cols)))
+                  all-modes)))
+    (eval `(progn
+             (transient-define-prefix
+               tray-builder--toggle-minor-mode ()
+               :transient-non-suffix 'transient--do-stay
+               :transient-suffix
+               'transient--do-call
+               [,@heads])
+             (tray-builder--toggle-minor-mode))
+          t)))
 
 ;;;###autoload
 (defun tray-builder-eval-all-active-modes-commands ()
@@ -970,12 +1134,15 @@ If ACTIVE is non nil, return bodies only for active modes."
     tray-builder-kill-from-minor-modes)]
   (interactive)
   (transient-setup 'tray-builder-menu)
-  (when-let ((string-result (when (region-active-p)
-                              (tray-builder--from-region-lines
-                               (region-beginning)
-                               (region-end)))))
-    (momentary-string-display string-result
-                              (point)
+  (when-let ((string-result
+              (when (region-active-p)
+                (tray-builder--from-region
+                 (region-beginning)
+                 (region-end)))))
+    (momentary-string-display (concat "\n" string-result "\n")
+                              (save-excursion
+                                (forward-line)
+                                (point))
                               nil
                               "Copied transient commands")))
 
