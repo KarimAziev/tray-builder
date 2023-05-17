@@ -397,7 +397,7 @@ Return new position if changed, nil otherwise."
                  (number-sequence 1 (min len parts-len))))))))
 
 (defun tray-builder-generate-shortcuts (items &optional key-fn value-fn)
-  "Generate shortcuts from list of ITEMS.
+	"Generate shortcuts from list of ITEMS.
 If KEY-FN is nil, ITEMS should be list of strings or symbols.
 If KEY-FN is a function, it will be called with every item of list, and should
 return string that will be as basis for shortcut.
@@ -405,7 +405,7 @@ If VALUE-FN is nil, result is an alist of generated keys and corresponding
 items.
 If VALUE-FN is non nil, return a list of results of calling VALUE-FN with two
 arguments - generated shortcut and item."
-  (let* ((total (length items))
+	(let* ((total (length items))
          (random-variants (append
                            (mapcar #'char-to-string
                                    (number-sequence (string-to-char
@@ -416,8 +416,7 @@ arguments - generated shortcut and item."
                                    (number-sequence (string-to-char
                                                      "A")
                                                     (string-to-char
-                                                     "Z")))
-                           (mapcar #'number-to-string (number-sequence 0 9))))
+                                                     "Z")))))
          (variants-len (length random-variants))
          (min-len
           (cond ((>= variants-len total)
@@ -846,9 +845,9 @@ outside of any parentheses, comments, or strings encountered in the scan."
      result)))
 
 (defun tray-builder-get-all-minor-modes-short-commands (&optional active)
-  "Return commands from minor modes with short keybindings.
+	"Return commands from minor modes with short keybindings.
 If ACTIVE is non nil, use only active modes."
-  (append (remove nil
+	(append (remove nil
                   (mapcar
                    (lambda (it)
                      (when (or (not active)
@@ -869,16 +868,17 @@ If ACTIVE is non nil, use only active modes."
                                 (tray-builder-commands-alist-to-transient
                                  val)))))
                    minor-mode-map-alist))
-          (list (apply #'vector :description "Local"
-                       (tray-builder-commands-alist-to-transient
-                        (seq-filter
-                         (lambda (it)
-                           (and (commandp (cdr it))
-                                (not
-                                 (string-match-p "C-\\|M-" (car
-                                                            it)))))
-                         (tray-builder-format-keymap-to-alist
-                          (current-local-map))))))))
+          (list
+					 (apply #'vector :description "Local"
+                  (tray-builder-commands-alist-to-transient
+                   (seq-filter
+                    (lambda (it)
+                      (and (commandp (cdr it))
+                           (not
+                            (string-match-p "C-\\|M-" (car
+                                                       it)))))
+                    (tray-builder-format-keymap-to-alist
+                     (symbol-value (help-fns--most-relevant-active-keymap)))))))))
 
 (defun tray-builder-get-minor-modes-commands (&optional active)
   "Generate prefixes from `minor-mode-map-alist'.
@@ -1026,16 +1026,177 @@ If ACTIVE is non nil, return bodies only for active modes."
                   (cdr it)))
                (tray-builder-format-keymap-to-alist
                 (current-local-map)))))
+(defun tray-builder-take-description (item)
+  "Return description from transient ITEM."
+  (when (proper-list-p item)
+    (if (stringp (nth 1 item))
+        (nth 1 item)
+      (when-let ((d (car (seq-drop
+                          (memq
+                           :description
+                           item)
+                          1))))
+        (if (functionp d)
+            (funcall d)
+          d)))))
+
+(defun tray-builder-take-key (item)
+  "Return key from transient ITEM."
+  (when (stringp (car-safe item))
+    (car item)))
+
+(defun tray-builder-group-vectors (arguments &optional height win-width)
+	"Group ARGUMENTS into vector.
+Default value for HEIGHT is `max-mini-window-height',
+and for WIN-WIDTH - window width."
+	(let* ((descriptions
+					(sort
+					 (mapcar #'(lambda
+											 (&rest args)
+											 (length
+												(apply
+												 #'(lambda
+														 (&rest args)
+														 (apply #'concat
+																		(list
+																		 (apply
+																			#'tray-builder-take-key
+																			args)
+																		 (apply
+																			#'tray-builder-take-description
+																			args))))
+												 args)))
+                   arguments)
+           #'>))
+         (longest (+ 10 (car descriptions)))
+         (win-width (or win-width (window-width)))
+         (max-cols (/ win-width longest))
+         (count (length arguments))
+         (height (or height
+										 (floor (* max-mini-window-height 100))))
+         (cols (if (>= height count)
+									 1
+								 (/ win-width longest)))
+         (final-cols (min max-cols cols))
+         (final (/ count final-cols)))
+    (mapcar
+     (lambda (it)
+       (apply #'vector it))
+     (seq-split arguments final))))
+
+(transient-define-prefix tray-builder-toggle-minor-mode ()
+	"Prefix that uses `setup-children' to generate a group."
+	["Minor modes"
+   ;; Let's override the group's method
+   :setup-children
+   (lambda (&rest _)
+     (let* ((maxwidth
+						 (min (length
+									 (car
+										(seq-sort-by #'length '>
+																 (mapcar (lambda (mode)
+																					 (replace-regexp-in-string
+																						"\\_<\\(Mode\\)\\_>"
+																						""
+																						(if-let ((doc
+																											(replace-regexp-in-string
+																											 "-" " "
+																											 (capitalize (symbol-name
+																																		mode)))))
+																								(replace-regexp-in-string
+																								 "^Toggle[\s]" ""
+																								 (replace-regexp-in-string
+																									"\\.$" ""
+																									(car
+																									 (split-string
+																										doc
+																										"\n"
+																										nil))))
+																							(symbol-name mode))))
+																				 minor-mode-list))))
+									(window-width)))
+						(all-modes
+						 (tray-builder-generate-shortcuts
+							(remove nil
+											(mapcar
+											 (lambda (mode)
+												 (when (and (boundp mode)
+																		(commandp mode))
+													 mode))
+											 minor-mode-list))
+							'symbol-name
+							(lambda (key mode)
+								(list
+								 key
+								 mode
+								 :description
+								 `(lambda ()
+										(let* ((mode ',mode)
+													 (doc (truncate-string-to-width
+																 (concat
+																	(if (and (boundp mode)
+																					 (symbol-value mode))
+																			"[x]"
+																		"[ ]")
+																	(replace-regexp-in-string
+																	 "\\_<\\(Mode\\)\\_>"
+																	 ""
+																	 (if-let ((doc
+																						 (replace-regexp-in-string
+																							"-" " "
+																							(capitalize (symbol-name
+																													 mode)))))
+																			 (replace-regexp-in-string
+																				"^Toggle[\s]" ""
+																				(replace-regexp-in-string
+																				 "\\.$" ""
+																				 (car
+																					(split-string
+																					 doc
+																					 "\n"
+																					 nil))))
+																		 (symbol-name mode)))
+																	(make-string ,maxwidth ?.))
+																 ,maxwidth
+																 nil nil)))
+											(if (and (boundp mode)
+															 (symbol-value mode))
+													(propertize doc 'face 'success)
+												doc)))
+								 :transient t))))
+						(heads (tray-builder-group-vectors all-modes)))
+			 heads))])
+
+
 
 ;;;###autoload
 (defun tray-builder-eval-toggle-minor-mode-prefix ()
-  "Generate and call transient prefix with all minor modes."
-  (interactive)
+	"Generate and call transient prefix with all minor modes."
+	(interactive)
   (let* ((maxwidth
           (min (length
                 (car
-                 (seq-sort-by #'length '> (mapcar #'symbol-name
-                                                 minor-mode-list))))
+                 (seq-sort-by #'length '>
+                              (mapcar (lambda (mode)
+                                        (replace-regexp-in-string
+                                         "\\_<\\(Mode\\)\\_>"
+                                         ""
+                                         (if-let ((doc
+                                                   (replace-regexp-in-string
+                                                    "-" " "
+                                                    (capitalize (symbol-name
+                                                                 mode)))))
+                                             (replace-regexp-in-string
+                                              "^Toggle[\s]" ""
+                                              (replace-regexp-in-string
+                                               "\\.$" ""
+                                               (car
+                                                (split-string
+                                                 doc
+                                                 "\n"
+                                                 nil))))
+                                           (symbol-name mode))))
+                                      minor-mode-list))))
                (window-width)))
          (all-modes
           (tray-builder-generate-shortcuts
@@ -1055,51 +1216,43 @@ If ACTIVE is non nil, return bodies only for active modes."
               `(lambda ()
                  (let* ((mode ',mode)
                         (doc (truncate-string-to-width
-                              (replace-regexp-in-string
-                               "\\_<\\(Mode\\)\\_>"
-                               ""
-                               (if-let ((doc (replace-regexp-in-string
-                                              "-" " " (capitalize (symbol-name
-                                                                   mode)))))
-                                   (replace-regexp-in-string "^Toggle[\s]" ""
-                                                             (replace-regexp-in-string
-                                                              "\\.$" ""
-                                                              (car
-                                                               (split-string
-                                                                doc
-                                                                "\n"
-                                                                nil))))
-                                 (symbol-name mode)))
+                              (concat
+                               (if (and (boundp mode)
+                                        (symbol-value mode))
+                                   "[x]"
+                                 "[ ]")
+                               (replace-regexp-in-string
+                                "\\_<\\(Mode\\)\\_>"
+                                ""
+                                (if-let ((doc
+                                          (replace-regexp-in-string
+                                           "-" " "
+                                           (capitalize (symbol-name
+                                                        mode)))))
+                                    (replace-regexp-in-string
+                                     "^Toggle[\s]" ""
+                                     (replace-regexp-in-string
+                                      "\\.$" ""
+                                      (car
+                                       (split-string
+                                        doc
+                                        "\n"
+                                        nil))))
+                                  (symbol-name mode)))
+                               (make-string ,maxwidth ?.))
                               ,maxwidth
-                              nil nil
-                              1)))
+                              nil nil)))
                    (if (and (boundp mode)
                             (symbol-value mode))
                        (propertize doc 'face 'success)
-                     doc)))))))
-         (count (length all-modes))
-         (height (- (window-height) 10))
-         (cols (max (if (and (> height 0)
-                             (> count height))
-                        (/ count height)
-                      (/ (window-width) maxwidth))
-                    1))
-         (heads (if
-                    (> (/ count cols) 1)
-                    (mapcar
-                     (lambda (it)
-                       (apply #'vector it))
-                     (seq-split all-modes (/ count cols)))
-                  all-modes)))
-    (eval `(progn
-             (transient-define-prefix
-               tray-builder--toggle-minor-mode ()
-               :transient-non-suffix 'transient--do-stay
-               :transient-suffix
-               'transient--do-call
-               [,@heads])
-             (tray-builder--toggle-minor-mode))
-          t)))
+                     doc)))
+							:transient t))))
+         (heads (tray-builder-group-vectors all-modes)))
+    (tray-builder-eval-dynamic-eval (make-symbol
+																		 "tray-builder-toggle-minor-mode")
+                                    `([,@heads]))))
+
+
 
 ;;;###autoload
 (defun tray-builder-eval-all-active-modes-commands ()
@@ -1109,6 +1262,16 @@ If ACTIVE is non nil, return bodies only for active modes."
                   :transient-non-suffix 'transient--do-exit
                   ,@(tray-builder-get-minor-modes-commands t))
                 (tray-builder-dispatch-short-keys))))
+
+
+
+(defun tray-builder-eval-dynamic-eval (name body)
+	"Eval and call transient prefix with NAME and BODY."
+	(eval `(progn (transient-define-prefix ,name ()
+                  ,@body)
+                (call-interactively ',name))
+        t))
+
 
 ;;;###autoload
 (defun tray-builder-eval-local-commands-prefix ()
