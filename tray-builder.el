@@ -53,20 +53,20 @@
     self-insert-command
     digit-argument
     undefined
-		scroll-up-command
-		scroll-down-command
+    scroll-up-command
+    scroll-down-command
     negative-argument)
   "List of commands to always exclude from `key-assist' output.")
 
 (defvar tray-builder-assist-exclude-regexps
-	"\\(^<\\|keymap\\|follow-link\\|compose-last-chars\\|drag-n-drop\\|menu\\|XF86Forward\\|XF86Back\\|help\\|iconify-frame\\|touch\\|mouse\\|wheel\\)\\|\\.\\."
+  "\\(^<\\|keymap\\|follow-link\\|compose-last-chars\\|drag-n-drop\\|menu\\|XF86Forward\\|XF86Back\\|help\\|iconify-frame\\|touch\\|mouse\\|wheel\\)\\|\\.\\."
   "List of regexps of commands to exclude from `key-assist' output.")
 
 (defun tray-builder-help-fns-find-keymap-name (keymap)
-	"Find the name of the variable with value KEYMAP.
+  "Find the name of the variable with value KEYMAP.
 Return nil if KEYMAP is not a valid keymap, or if there is no
 variable with value KEYMAP."
-	(when (keymapp keymap)
+  (when (keymapp keymap)
     (let ((name (catch 'found-keymap
                   (mapatoms (lambda (symb)
                               (when (and (boundp symb)
@@ -169,8 +169,8 @@ TRANSFORM-FN should return transformed item."
 
 
 (defun tray-builder-format-keymap-to-alist (keymap &optional symb-prefix)
-	"Convert KEYMAP to alist and filter by SYMB-PREFIX."
-	(when (keymapp keymap)
+  "Convert KEYMAP to alist and filter by SYMB-PREFIX."
+  (when (keymapp keymap)
     (if-let ((name
               (when symb-prefix
                 (car
@@ -241,10 +241,15 @@ Return new position if changed, nil otherwise."
               cands)))
     (reverse cands)))
 
+(defun tray-builder-abbreviate-word (word)
+  "Abbreviate WORD."
+  (mapcar (apply-partially #'tray-builder-safe-substring 1)
+          (split-string word "[^a-z]" t)))
+
 (defun tray-builder-get-all-key-strategies (word len)
   "Generate preffered shortcut from WORD with length LEN."
-  (let* ((parts (append (split-string word "[^a-zz-a]" t)
-                        (list (replace-regexp-in-string "[^a-zz-a]" "" word))))
+  (let* ((parts (append (split-string word "[^a-z]" t)
+                        (list (replace-regexp-in-string "[^a-z]" "" word))))
          (parts-len (length parts))
          (finalize (lambda (short)
                      (while (> len (length short))
@@ -254,7 +259,7 @@ Return new position if changed, nil otherwise."
           (mapcar finalize (tray-builder-capitalize-variants
                             (tray-builder-safe-substring len
                                                          (replace-regexp-in-string
-                                                          "[^a-zz-a]"
+                                                          "[^a-z]"
                                                           ""
                                                           word))))))
     (seq-sort-by
@@ -282,20 +287,22 @@ Return new position if changed, nil otherwise."
                                       (reverse parts))))
                  (number-sequence 1 (min len parts-len))))))))
 
-(defun tray-builder-generate-shortcuts (items &optional key-fn value-fn)
-	"Generate shortcuts from list of ITEMS.
+(defun tray-builder-generate-shortcuts (items &optional key-fn value-fn
+                                              used-keys)
+  "Generate shortcuts from list of ITEMS.
 If KEY-FN is nil, ITEMS should be list of strings or symbols.
 If KEY-FN is a function, it will be called with every item of list, and should
 return string that will be as basis for shortcut.
 If VALUE-FN is nil, result is an alist of generated keys and corresponding
 items.
 If VALUE-FN is non nil, return a list of results of calling VALUE-FN with two
-arguments - generated shortcut and item."
-	(let* ((value-fn (or value-fn (lambda (key value)
-																	(if (proper-list-p value)
-																			(append (list key) value)
-																		(cons key value)))))
-				 (total (length items))
+arguments - generated shortcut and item.
+USED-KEYS is a list of keys that shouldn't be used."
+  (let* ((value-fn (or value-fn (lambda (key value)
+                                  (if (proper-list-p value)
+                                      (append (list key) value)
+                                    (cons key value)))))
+         (total (length items))
          (random-variants (append
                            (mapcar #'char-to-string
                                    (number-sequence (string-to-char
@@ -309,23 +316,32 @@ arguments - generated shortcut and item."
                                                      "Z")))))
          (variants-len (length random-variants))
          (min-len
-          (cond ((>= variants-len total)
-                 1)
-                ((>= variants-len (/ total 2))
-                 2)
-                (t 3))))
-    (let ((shortcuts '())
-          (used '())
+          (if used-keys
+              (length (car (seq-sort-by #'length #'> used-keys)))
+            (cond ((>= variants-len total)
+                   1)
+                  ((>= variants-len (/ total 2))
+                   2)
+                  (t 3)))))
+    (let ((shortcuts used-keys)
+          (used-words '())
+          (all-keys (mapcar (lambda (def)
+                              (if key-fn
+                                  (funcall key-fn def)
+                                (if (symbolp def)
+                                    (symbol-name def)
+                                  def)))
+                            items))
           (result))
       (dotimes (i (length items))
-        (let* ((def (nth i items))
-               (word (if key-fn
-                         (funcall key-fn def)
-                       (if (symbolp def)
-                           (symbol-name def)
-                         def))))
-          (when (not (member word used))
-            (push word used)
+        (when-let* ((def (nth i items))
+                    (word (if key-fn
+                              (funcall key-fn def)
+                            (if (symbolp def)
+                                (symbol-name def)
+                              def))))
+          (when (not (member word used-words))
+            (push word used-words)
             (let ((short
                    (downcase
                     (substring-no-properties word 0
@@ -339,18 +355,25 @@ arguments - generated shortcut and item."
                         (seq-find (apply-partially
                                    #'string-prefix-p it)
                                   shortcuts)))
-                     (append (tray-builder-get-all-key-strategies word
-                                                                  min-len)
-                             (when (= min-len 1)
-                               random-variants))))
+                     (append
+                      (tray-builder-get-all-key-strategies word
+                                                           min-len)
+                      (when (= min-len 1)
+                        (or (seq-remove (lambda (key)
+                                          (seq-find (apply-partially
+                                                     #'string-prefix-p
+                                                     (downcase key))
+                                                    all-keys))
+                                        random-variants)
+                            random-variants)))))
               (while (and
                       (< (length short) min-len))
                 (setq short (concat short (number-to-string (random 10)))))
               (push short shortcuts)
               (push
-							 (cond ((functionp value-fn)
-											(funcall value-fn short def))
-										 (t (cons short def)))
+               (cond ((functionp value-fn)
+                      (funcall value-fn short def))
+                     (t (cons short def)))
                result)))))
       (reverse result))))
 
@@ -414,13 +437,13 @@ arguments - generated shortcut and item."
               strings (pop strings)))
 
 (defun tray-builder-commands-alist-to-transient (commands &optional short-descr
-																													generate-keys)
-	"Generate transient body from COMMANDS.
+                                                          generate-keys)
+  "Generate transient body from COMMANDS.
 GENERATE-KEYS
 IF SHORT-DESCR is non nil, use short descriptions.
 COMMANDS should be either list of symbols,
 or alist of keys and symbols."
-	(let ((used-keys)
+  (let ((used-keys)
         (line)
         (shared-prefix
          (tray-builder-find-longest-prefix
@@ -454,11 +477,11 @@ or alist of keys and symbols."
                   (key (if (and (stringp (car-safe line))
                                 (key-valid-p (car line)))
                            (when-let ((short
-																			 (if generate-keys
-																					 (tray-builder-shorten-key-description
-																						(car
-																						 line))
-																				 (car line))))
+                                       (if generate-keys
+                                           (tray-builder-shorten-key-description
+                                            (car
+                                             line))
+                                         (car line))))
                              (if (and short (not (member short used-keys)))
                                  short
                                (car line)))
@@ -488,28 +511,28 @@ or alist of keys and symbols."
                   (doc (or (if (proper-list-p line)
                                (seq-find #'stringp (remove key line))
                              (and (not short-descr)
-																	(when-let* ((doc-str (ignore-errors (documentation
-																																			 symb)))
-																							(parts (split-string
-																											(replace-regexp-in-string
-																											 "[.][\s\t]?+$"
-																											 ""
-																											 (car
-																												(split-string
-																												 (substring-no-properties
-																													doc-str)
-																												 "\n" t)))
-																											nil t)))
-																		(let ((case-fold-search nil))
-																			(mapconcat
-																			 (lambda (it)
-																				 (if (and (string-match-p "[A-ZZ-A]" it)
-																									(not (string-match-p "[a-z]"
-																																			 it))
-																									(> (length it) 1))
-																						 (downcase it)
-																					 it))
-																			 parts "\s")))))
+                                  (when-let* ((doc-str (ignore-errors (documentation
+                                                                       symb)))
+                                              (parts (split-string
+                                                      (replace-regexp-in-string
+                                                       "[.][\s\t]?+$"
+                                                       ""
+                                                       (car
+                                                        (split-string
+                                                         (substring-no-properties
+                                                          doc-str)
+                                                         "\n" t)))
+                                                      nil t)))
+                                    (let ((case-fold-search nil))
+                                      (mapconcat
+                                       (lambda (it)
+                                         (if (and (string-match-p "[A-ZZ-A]" it)
+                                                  (not (string-match-p "[a-z]"
+                                                                       it))
+                                                  (> (length it) 1))
+                                             (downcase it)
+                                           it))
+                                       parts "\s")))))
                            (tray-builder-name-to-doc
                             (tray-builder-shorten-name (symbol-name symb)
                                                        shared-prefix)))))
@@ -524,7 +547,7 @@ or alist of keys and symbols."
                            (list symb doc)))
             (push (list key doc symb :transient t) result)
           (push (list key doc symb) result))))
-		result))
+    result))
 
 
 
@@ -551,9 +574,9 @@ or alist of keys and symbols."
                    doc))))
 
 (defun tray-builder-get-current-major-mode-map ()
-	"Return current major mode map."
-	(when-let ((sym (intern-soft (concat (symbol-name major-mode) "-map"))))
-		(symbol-value sym)))
+  "Return current major mode map."
+  (when-let ((sym (intern-soft (concat (symbol-name major-mode) "-map"))))
+    (symbol-value sym)))
 
 ;;;###autoload
 (defun tray-builder-hydra-to-transient (begin end)
@@ -753,9 +776,9 @@ outside of any parentheses, comments, or strings encountered in the scan."
      result)))
 
 (defun tray-builder-get-all-minor-modes-short-commands (&optional active)
-	"Return commands from minor modes with short keybindings.
+  "Return commands from minor modes with short keybindings.
 If ACTIVE is non nil, use only active modes."
-	(append (remove nil
+  (append (remove nil
                   (mapcar
                    (lambda (it)
                      (when (or (not active)
@@ -777,7 +800,7 @@ If ACTIVE is non nil, use only active modes."
                                  val t t)))))
                    minor-mode-map-alist))
           (list
-					 (apply #'vector :description "Local"
+           (apply #'vector :description "Local"
                   (tray-builder-commands-alist-to-transient
                    (seq-filter
                     (lambda (it)
@@ -787,14 +810,14 @@ If ACTIVE is non nil, use only active modes."
                                                        it)))))
                     (tray-builder-keymap-to-alist
                      (symbol-value
-											(tray-builder-help-fns--most-relevant-active-keymap))))
-									 nil
-									 t)))))
+                      (tray-builder-help-fns--most-relevant-active-keymap))))
+                   nil
+                   t)))))
 
 (defun tray-builder--substitute-map (sym &optional full shadow prefix title
-																				 with-menu transl always-title
-																				 mention-shadow buffer)
-	"Return a description of the key bindings in SYM.
+                                         with-menu transl always-title
+                                         mention-shadow buffer)
+  "Return a description of the key bindings in SYM.
 This is followed by the key bindings of all maps reachable
 through STARTMAP.
 
@@ -823,112 +846,112 @@ shadowed.
 
 If BUFFER, lookup keys while in that buffer.  This only affects
 things like :filters for menu bindings."
-	(when-let ((value
-							(cond ((keymapp sym)
-										 sym)
-										((stringp sym)
-										 (ignore-errors (symbol-value (intern-soft sym))))
-										((symbolp sym)
-										 (symbol-value sym))))
-						 (buff (or buffer (current-buffer))))
-		(with-temp-buffer
-			(describe-map-tree value
-												 (not full)
-												 shadow
-												 prefix
-												 title
-												 (not with-menu)
-												 transl
-												 always-title
-												 mention-shadow
-												 buff)
-			(buffer-string))))
+  (when-let ((value
+              (cond ((keymapp sym)
+                     sym)
+                    ((stringp sym)
+                     (ignore-errors (symbol-value (intern-soft sym))))
+                    ((symbolp sym)
+                     (symbol-value sym))))
+             (buff (or buffer (current-buffer))))
+    (with-temp-buffer
+      (describe-map-tree value
+                         (not full)
+                         shadow
+                         prefix
+                         title
+                         (not with-menu)
+                         transl
+                         always-title
+                         mention-shadow
+                         buff)
+      (buffer-string))))
 
 (defun tray-builder-keymap-to-alist (keymap &optional filter &rest args)
-	"Format KEYMAP to alist.
+  "Format KEYMAP to alist.
 FILTER is called with key description and symbol.
 ARGS is the argument for `tray-builder--substitute-map'."
-	(when-let* ((lines (split-string (apply #'tray-builder--substitute-map
-																					(append
-																					 (list
-																						keymap)
-																					 args))
-																	 "\n"
-																	 t))
-							(filtered (delq nil (mapcar
-																	 (lambda
-																		 (it)
-																		 (when-let* ((chars 	(and it
-																															 (stringp it)
-																															 (split-string it "" t)))
-																								 (key-chars
-																									(seq-take-while
-																									 (lambda (c)
-																										 (get-text-property
-																											0
-																											'face
-																											c))
-																									 chars))
-																								 (key (string-join key-chars ""))
-																								 (cmd (intern-soft
-																											 (string-trim (substring-no-properties
-																																		 it (length
-																																				 key))))))
-																			 (when (and (key-valid-p key)
-																									(not (string-match-p
-																												tray-builder-assist-exclude-regexps
-																												key))
-																									(not
-																									 (memq cmd
-																												 tray-builder-exclude-cmds))
-																									(or (not filter)
-																											(funcall filter key cmd)))
-																				 (cons													(substring-no-properties
-																																				 key)
-																																				cmd))))
-																	 lines))))
-		(seq-sort-by
-		 (lambda (a)
-			 (length (car a)))
-		 #'<
-		 (seq-uniq filtered (lambda (a b)
-													(eq (cdr a)
-															(cdr b)))))))
+  (when-let* ((lines (split-string (apply #'tray-builder--substitute-map
+                                          (append
+                                           (list
+                                            keymap)
+                                           args))
+                                   "\n"
+                                   t))
+              (filtered (delq nil (mapcar
+                                   (lambda
+                                     (it)
+                                     (when-let* ((chars 	(and it
+                                                               (stringp it)
+                                                               (split-string it "" t)))
+                                                 (key-chars
+                                                  (seq-take-while
+                                                   (lambda (c)
+                                                     (get-text-property
+                                                      0
+                                                      'face
+                                                      c))
+                                                   chars))
+                                                 (key (string-join key-chars ""))
+                                                 (cmd (intern-soft
+                                                       (string-trim (substring-no-properties
+                                                                     it (length
+                                                                         key))))))
+                                       (when (and (key-valid-p key)
+                                                  (not (string-match-p
+                                                        tray-builder-assist-exclude-regexps
+                                                        key))
+                                                  (not
+                                                   (memq cmd
+                                                         tray-builder-exclude-cmds))
+                                                  (or (not filter)
+                                                      (funcall filter key cmd)))
+                                         (cons													(substring-no-properties
+                                                                         key)
+                                                                        cmd))))
+                                   lines))))
+    (seq-sort-by
+     (lambda (a)
+       (length (car a)))
+     #'<
+     (seq-uniq filtered (lambda (a b)
+                          (eq (cdr a)
+                              (cdr b)))))))
 
 
 
 (defun tray-builder-all-keymaps (&optional filter)
-	"Return alist of all keymaps filtered with FILTER."
-	(let (maps)
+  "Return alist of all keymaps filtered with FILTER."
+  (let (maps)
     (mapatoms (lambda (sym)
-								(when-let ((value (and (boundp sym)
-																			 (keymapp (symbol-value
-																								 sym))
-																			 (tray-builder-keymap-to-alist
-																				sym))))
-									(when (or (not filter)
-														(funcall filter value))
-										(push (cons sym value) maps)))))
+                (when-let ((value (and (boundp sym)
+                                       (keymapp (symbol-value
+                                                 sym))
+                                       (tray-builder-keymap-to-alist
+                                        sym))))
+                  (when (or (not filter)
+                            (funcall filter value))
+                    (push (cons sym value) maps)))))
     maps))
 
 
 (defun tray-builder-substitute-map (sym)
-	"Substitute SYM."
-	(let ((str (substitute-command-keys
-							(format "\\{%s}" (if (stringp sym)
-																	 sym
-																 (symbol-name
-																	(if (keymapp sym)
-																			(tray-builder-help-fns-find-keymap-name
-																			 sym)
-																		sym))))
-							
-							t nil)))
-		str))
+  "Substitute SYM."
+  (let ((str (substitute-command-keys
+              (format "\\{%s}" (if (stringp sym)
+                                   sym
+                                 (symbol-name
+                                  (if (keymapp sym)
+                                      (tray-builder-help-fns-find-keymap-name
+                                       sym)
+                                    sym))))
+
+              t nil)))
+    str))
 
 (defun tray-builder-get-major-modes ()
-	"Return all modes from `auto-mode-alist'."
-	(seq-filter 'commandp (seq-uniq (flatten-list (mapcar 'cdr auto-mode-alist)))))
+  "Return all modes from `auto-mode-alist'."
+  (seq-filter #'commandp (seq-uniq (flatten-list (mapcar #'cdr auto-mode-alist)))))
 
 
 (defun tray-builder-get-minor-modes-commands (&optional active)
@@ -988,8 +1011,9 @@ If ACTIVE is non nil, return bodies only for active modes."
                                                             sym))
                                                   (push sym maps))))
                                  maps))))))
-  (if-let ((commands (tray-builder-commands-alist-to-transient
-                      (tray-builder-format-keymap-to-alist keymap))))
+  (if-let ((commands (reverse (tray-builder-commands-alist-to-transient
+                               (tray-builder-format-keymap-to-alist keymap)
+                               (yes-or-no-p "Use short descriptions?")))))
       (progn (kill-new (tray-builder-prettify-vectors commands))
              (message "Copied"))
     (message "Couldn't extract commands")))
@@ -1098,26 +1122,26 @@ If ACTIVE is non nil, return bodies only for active modes."
     (car item)))
 
 (defun tray-builder-group-vectors (arguments &optional height win-width)
-	"Group ARGUMENTS into vector.
+  "Group ARGUMENTS into vector.
 Default value for HEIGHT is `max-mini-window-height',
 and for WIN-WIDTH - window width."
-	(let* ((descriptions
-					(sort
-					 (mapcar #'(lambda
-											 (&rest args)
-											 (length
-												(apply
-												 #'(lambda
-														 (&rest args)
-														 (apply #'concat
-																		(list
-																		 (apply
-																			#'tray-builder-take-key
-																			args)
-																		 (apply
-																			#'tray-builder-take-description
-																			args))))
-												 args)))
+  (let* ((descriptions
+          (sort
+           (mapcar #'(lambda
+                       (&rest args)
+                       (length
+                        (apply
+                         #'(lambda
+                             (&rest args)
+                             (apply #'concat
+                                    (list
+                                     (apply
+                                      #'tray-builder-take-key
+                                      args)
+                                     (apply
+                                      #'tray-builder-take-description
+                                      args))))
+                         args)))
                    arguments)
            #'>))
          (longest (+ 10 (car descriptions)))
@@ -1125,10 +1149,10 @@ and for WIN-WIDTH - window width."
          (max-cols (/ win-width longest))
          (count (length arguments))
          (height (or height
-										 (floor (* max-mini-window-height 100))))
+                     (floor (* max-mini-window-height 100))))
          (cols (if (>= height count)
-									 1
-								 (/ win-width longest)))
+                   1
+                 (/ win-width longest)))
          (final-cols (min max-cols cols))
          (final (/ count final-cols)))
     (mapcar
@@ -1139,119 +1163,107 @@ and for WIN-WIDTH - window width."
 
 ;;;###autoload (autoload 'tray-builder-toggle-minor-mode "tray-builder.el" nil t)
 (transient-define-prefix tray-builder-toggle-minor-mode ()
-	"Prefix that uses `setup-children' to generate a group."
-	["Minor modes"
+  "Prefix that uses `setup-children' to generate a group."
+  ["Minor modes"
    ;; Let's override the group's method
    :setup-children
    (lambda (&rest _)
      (car
-			(let* ((maxwidth
-							(min (length
-										(car
-										 (seq-sort-by #'length '>
-																	(mapcar (lambda (mode)
-																						(replace-regexp-in-string
-																						 "\\_<\\(Mode\\)\\_>"
-																						 ""
-																						 (if-let ((doc
-																											 (replace-regexp-in-string
-																												"-" " "
-																												(capitalize (symbol-name
-																																		 mode)))))
-																								 (replace-regexp-in-string
-																									"^Toggle[\s]" ""
-																									(replace-regexp-in-string
-																									 "\\.$" ""
-																									 (car
-																										(split-string
-																										 doc
-																										 "\n"
-																										 nil))))
-																							 (symbol-name mode))))
-																					minor-mode-list))))
-									 (window-width)))
-						 (all-modes
-							(tray-builder-generate-shortcuts
-							 (remove nil
-											 (mapcar
-												(lambda (mode)
-													(when (and (boundp mode)
-																		 (commandp mode))
-														mode))
-												minor-mode-list))
-							 'symbol-name
-							 (lambda (key mode)
-								 (list
-									key
-									mode
-									:description
-									`(lambda ()
-										 (let* ((mode ',mode)
-														(doc (truncate-string-to-width
-																	(concat
-																	 (if (and (boundp mode)
-																						(symbol-value mode))
-																			 "[x]"
-																		 "[ ]")
-																	 (replace-regexp-in-string
-																		"\\_<\\(Mode\\)\\_>"
-																		""
-																		(if-let ((doc
-																							(replace-regexp-in-string
-																							 "-" " "
-																							 (capitalize (symbol-name
-																														mode)))))
-																				(replace-regexp-in-string
-																				 "^Toggle[\s]" ""
-																				 (replace-regexp-in-string
-																					"\\.$" ""
-																					(car
-																					 (split-string
-																						doc
-																						"\n"
-																						nil))))
-																			(symbol-name mode)))
-																	 (make-string ,maxwidth ?.))
-																	,maxwidth
-																	nil nil)))
-											 (if (and (boundp mode)
-																(symbol-value mode))
-													 (propertize doc 'face 'success)
-												 doc)))
-									:transient t))))
-						 (heads (tray-builder-group-vectors all-modes)))
-				(list (transient--parse-group transient--prefix heads)))))])
+      (let* ((maxwidth
+              (min (length
+                    (car
+                     (seq-sort-by #'length '>
+                                  (mapcar (lambda (mode)
+                                            (replace-regexp-in-string
+                                             "\\_<\\(Mode\\)\\_>"
+                                             ""
+                                             (if-let ((doc
+                                                       (replace-regexp-in-string
+                                                        "-" " "
+                                                        (capitalize (symbol-name
+                                                                     mode)))))
+                                                 (replace-regexp-in-string
+                                                  "^Toggle[\s]" ""
+                                                  (replace-regexp-in-string
+                                                   "\\.$" ""
+                                                   (car
+                                                    (split-string
+                                                     doc
+                                                     "\n"
+                                                     nil))))
+                                               (symbol-name mode))))
+                                          minor-mode-list))))
+                   (window-width)))
+             (all-modes
+              (tray-builder-generate-shortcuts
+               (remove nil
+                       (mapcar
+                        (lambda (mode)
+                          (when (and (boundp mode)
+                                     (commandp mode))
+                            mode))
+                        minor-mode-list))
+               'symbol-name
+               (lambda (key mode)
+                 (list
+                  key
+                  mode
+                  :description
+                  `(lambda ()
+                     (let* ((mode ',mode)
+                            (doc (truncate-string-to-width
+                                  (concat
+                                   (if (and (boundp mode)
+                                            (symbol-value mode))
+                                       "[x]"
+                                     "[ ]")
+                                   (replace-regexp-in-string
+                                    "\\_<\\(Mode\\)\\_>"
+                                    ""
+                                    (if-let ((doc
+                                              (replace-regexp-in-string
+                                               "-" " "
+                                               (capitalize (symbol-name
+                                                            mode)))))
+                                        (replace-regexp-in-string
+                                         "^Toggle[\s]" ""
+                                         (replace-regexp-in-string
+                                          "\\.$" ""
+                                          (car
+                                           (split-string
+                                            doc
+                                            "\n"
+                                            nil))))
+                                      (symbol-name mode)))
+                                   (make-string ,maxwidth ?.))
+                                  ,maxwidth
+                                  nil nil)))
+                       (if (and (boundp mode)
+                                (symbol-value mode))
+                           (propertize doc 'face 'success)
+                         doc)))
+                  :transient t))))
+             (heads (tray-builder-group-vectors all-modes)))
+        (list (transient--parse-group transient--prefix heads)))))])
 
 
 
 ;;;###autoload
 (defun tray-builder-eval-toggle-minor-mode-prefix ()
-	"Generate and call transient prefix with all minor modes."
-	(interactive)
+  "Generate and call transient prefix with all minor modes."
+  (interactive)
   (let* ((maxwidth
           (min (length
-                (car
-                 (seq-sort-by #'length '>
-                              (mapcar (lambda (mode)
-                                        (replace-regexp-in-string
-                                         "\\_<\\(Mode\\)\\_>"
-                                         ""
-                                         (if-let ((doc
-                                                   (replace-regexp-in-string
-                                                    "-" " "
-                                                    (capitalize (symbol-name
-                                                                 mode)))))
-                                             (replace-regexp-in-string
-                                              "^Toggle[\s]" ""
-                                              (replace-regexp-in-string
-                                               "\\.$" ""
-                                               (car
-                                                (split-string
-                                                 doc
-                                                 "\n"
-                                                 nil))))
-                                           (symbol-name mode))))
-                                      minor-mode-list))))
+                (seq-sort-by (lambda (mode)
+                               (length (replace-regexp-in-string
+                                        "^Toggle[\s]\\|\\.$\\|-\\|Mode"
+                                        (lambda (it)
+                                          (pcase it
+                                            ("-" " ")
+                                            (_ "")))
+                                        (capitalize (symbol-name mode)))))
+                             #'>
+                             minor-mode-list))
                (window-width)))
          (all-modes
           (tray-builder-generate-shortcuts
@@ -1262,7 +1274,7 @@ and for WIN-WIDTH - window width."
                                  (commandp mode))
                         mode))
                     minor-mode-list))
-           'symbol-name
+           #'symbol-name
            (lambda (key mode)
              (list
               key
@@ -1270,83 +1282,67 @@ and for WIN-WIDTH - window width."
               :description
               `(lambda ()
                  (let* ((mode ',mode)
+                        (label (replace-regexp-in-string
+                                "^Toggle[\s]\\|\\.$\\|-\\|Mode"
+                                (lambda (it)
+                                  (pcase it
+                                    ("-" " ")
+                                    (_ "")))
+                                (capitalize (symbol-name mode))))
                         (doc (truncate-string-to-width
-                              (concat
-                               (if (and (boundp mode)
-                                        (symbol-value mode))
-                                   "[x]"
-                                 "[ ]")
-															 " "
-                               (replace-regexp-in-string
-                                "\\_<\\(Mode\\)\\_>"
-                                ""
-                                (if-let ((doc
-                                          (replace-regexp-in-string
-                                           "-" " "
-                                           (capitalize (symbol-name
-                                                        mode)))))
-                                    (replace-regexp-in-string
-                                     "^Toggle[\s]" ""
-                                     (replace-regexp-in-string
-                                      "\\.$" ""
-                                      (car
-                                       (split-string
-                                        doc
-                                        "\n"
-                                        nil))))
-                                  (symbol-name mode)))
-                               (make-string ,maxwidth ?.))
-                              ,maxwidth
-                              nil nil)))
+                              label
+                              ,maxwidth nil nil nil ".")))
                    (if (and (boundp mode)
                             (symbol-value mode))
                        (propertize doc 'face 'success)
                      doc)))
-							:transient t)))))
+              :transient t))))
+         (groupped (mapcar
+                    (lambda (it)
+                      (apply #'vector it))
+                    (seq-split all-modes (/ (length all-modes) 5)))))
     (call-interactively
-		 (tray-builder-eval-dynamic-eval (make-symbol
-																			"tray-builder-toggle-minor-mode")
-                                     `([,@(tray-builder-group-vectors all-modes)])))))
-
-
+     (tray-builder-eval-dynamic-eval (make-symbol
+                                      "tray-builder-toggle-minor-mode")
+                                     `([,@groupped])))))
 
 
 ;;;###autoload
 (defun tray-builder-dwim ()
-	"Dispatch local commands with short keys."
-	(interactive)
-	(call-interactively (tray-builder-eval-dynamic-eval
-											 "tray-builder-active-modes"
-											 `([,@(tray-builder-group-vectors
-														 (tray-builder-commands-alist-to-transient
-															(append
-															 (or
-																(tray-builder-keymap-to-alist
-																 (current-local-map)
-																 (lambda (_key value)
-																	 (not
-																		(eq value
-																				'tray-builder-dwim))))
-																(when-let
-																		((sym
-																			(tray-builder-help-fns--most-relevant-active-keymap)))
-																	(tray-builder-keymap-to-alist
-																	 sym)))
-															 (list (cons "?"
-																					 'describe-mode)))
-															t))]))))
+  "Show menu with relevant local commands and their real keybindings."
+  (interactive)
+  (call-interactively (tray-builder-eval-dynamic-eval
+                       "tray-builder-active-modes"
+                       `([,@(tray-builder-group-vectors
+                             (tray-builder-commands-alist-to-transient
+                              (append
+                               (or
+                                (tray-builder-keymap-to-alist
+                                 (current-local-map)
+                                 (lambda (_key value)
+                                   (not
+                                    (eq value
+                                        'tray-builder-dwim))))
+                                (when-let
+                                    ((sym
+                                      (tray-builder-help-fns--most-relevant-active-keymap)))
+                                  (tray-builder-keymap-to-alist
+                                   sym)))
+                               (list (cons "?"
+                                           'describe-mode)))
+                              t))]))))
 
 
 (defun tray-builder-eval-dynamic-eval (name body)
-	"Eval and call transient prefix with NAME and BODY."
-	(when (stringp name)
-		(setq name (make-symbol name)))
-	(eval `(progn
-					 (transient-define-prefix ,name ()
-						 ,@body
-						 (interactive)
-						 (transient-setup ',name))
-					 ',name)
+  "Eval and call transient prefix with NAME and BODY."
+  (when (stringp name)
+    (setq name (make-symbol name)))
+  (eval `(progn
+           (transient-define-prefix ,name ()
+             ,@body
+             (interactive)
+             (transient-setup ',name))
+           ',name)
         t))
 
 
