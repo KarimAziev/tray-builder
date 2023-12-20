@@ -442,19 +442,16 @@ or alist of keys and symbols."
           (remove nil
                   (mapcar
                    (lambda (it)
-                     (when-let ((symb
-                                 (if (proper-list-p
-                                      it)
-                                     (seq-find
-                                      #'symbolp
-                                      it)
-                                   (seq-find
-                                    #'symbolp
-                                    (list
-                                     (car
-                                      it)
-                                     (cdr
-                                      it))))))
+                     (when-let
+                         ((symb
+                           (pcase it
+                             ((pred (symbolp))
+                              it)
+                             ((pred (proper-list-p))
+                              (seq-find #'symbolp it))
+                             ((pred consp)
+                              (seq-find #'symbolp (list (car it)
+                                                        (cdr it)))))))
                        (symbol-name symb)))
                    commands))))
         (result))
