@@ -44,7 +44,20 @@
                                                      "prev"
                                                      "previous"
                                                      "scroll")
-  "List of words to indicate that generated commmand shouldn't exit transient."
+  "List of words to match in transient documentation for tray-builder actions.
+
+A list of words used to match against documentation strings for transient
+commands in the tray builder. These words are typically associated with
+navigation or state-changing actions such as moving through text or undoing
+changes.
+
+Each element in the list must be a string that represents a word to be matched.
+The default list includes common action words like \"forward\", \"backward\",
+\"undo\", and \"redo\".
+
+The matching process uses these words to identify relevant documentation strings
+for transient commands, aiding in the creation of a context-sensitive tray of
+actions."
   :type '(repeat string)
   :group 'tray-builder)
 
@@ -56,16 +69,16 @@
     scroll-up-command
     scroll-down-command
     negative-argument)
-  "List of commands to always exclude from `key-assist' output.")
+  "List of commands to exclude from tray building.")
 
 (defvar tray-builder-assist-exclude-regexps
   "\\(^<\\|keymap\\|follow-link\\|compose-last-chars\\|drag-n-drop\\|menu\\|XF86Forward\\|XF86Back\\|help\\|iconify-frame\\|touch\\|mouse\\|wheel\\)\\|\\.\\."
-  "List of regexps of commands to exclude from `key-assist' output.")
+  "List of regex patterns to exclude from tray builder assist.")
 
 (defun tray-builder-help-fns-find-keymap-name (keymap)
-  "Find the name of the variable with value KEYMAP.
-Return nil if KEYMAP is not a valid keymap, or if there is no
-variable with value KEYMAP."
+  "Find a symbol name for a given keymap.
+
+Argument KEYMAP is a keymap to search for its variable name."
   (when (keymapp keymap)
     (let ((name (catch 'found-keymap
                   (mapatoms (lambda (symb)
@@ -78,31 +91,28 @@ variable with value KEYMAP."
       (or (ignore-errors (indirect-variable name)) name))))
 
 (defun tray-builder-help-fns--most-relevant-active-keymap ()
-  "Return the name of the most relevant active keymap.
-The heuristic to determine which keymap is most likely to be
-relevant to a user follows this order:
-
-1. `keymap' text property at point
-2. `local-map' text property at point
-3. the `current-local-map'
-
-This is used to set the default value for the interactive prompt
-in `describe-keymap'.  See also `Searching the Active Keymaps'."
+  "Find the most relevant active keymap at point."
   (tray-builder-help-fns-find-keymap-name (or (get-char-property (point) 'keymap)
                          (if (get-text-property (point) 'local-map)
                              (get-char-property (point) 'local-map)
                            (current-local-map)))))
 
 (defun tray-builder-copy-as-string (result)
-  "Copy RESULT according to MODE-FN called with ARGS.
-If RESULT is not a string, instead of MODE-FN emacs-lisp-mode will be used."
+  "Copy formatted RESULT to clipboard and display it.
+
+Argument RESULT is the data structure to be converted to a string and copied to
+the clipboard."
   (let ((content (tray-builder-prettify-vector result)))
     (kill-new content)
     (message content)
     content))
 
 (defun tray-builder-shared-start (s1 s2)
-  "Return the longest prefix S1 and S2 have in common."
+  "Find common prefix of strings S1 and S2.
+
+Argument S1 is a string to compare.
+
+Argument S2 is another string to compare against S1."
   (declare (pure t)
            (side-effect-free t))
   (let ((search-length (min (length s1)
@@ -115,7 +125,12 @@ If RESULT is not a string, instead of MODE-FN emacs-lisp-mode will be used."
     (substring s1 0 i)))
 
 (defun tray-builder-format-keymap-to-alist (keymap &optional symb-prefix)
-  "Convert KEYMAP to alist and filter by SYMB-PREFIX."
+  "Convert KEYMAP to alist, optionally filtering with symb-prefix.
+
+Argument KEYMAP is the keymap to convert to an alist.
+
+Optional argument SYMB-PREFIX is a symbol or string used as a prefix to filter
+KEYMAP entries."
   (when (keymapp keymap)
     (if-let ((name
               (when symb-prefix
@@ -133,14 +148,22 @@ If RESULT is not a string, instead of MODE-FN emacs-lisp-mode will be used."
       (tray-builder-keymap-to-alist keymap))))
 
 (defun tray-builder-shortcut-pred (used-keys key)
-  "Return non nil if KEY is a valid and not present in USED-KEYS."
+  "Check if KEY is valid and not in USED-KEYS.
+
+Argument USED-KEYS is a list of keys that have already been used.
+
+Argument KEY is the key to be checked for validity and non-membership in
+USED-KEYS."
   (and
    (key-valid-p key)
    (not (member key used-keys))))
 
 (defun tray-builder-move-with (fn &optional n)
-  "Move by calling FN N times.
-Return new position if changed, nil otherwise."
+  "Move point using FN, optionally N times.
+
+Argument FN is a function to be called that moves the point.
+
+Optional argument N is the number of times to call FN; it defaults to 1."
   (unless n (setq n 1))
   (let ((parse-sexp-ignore-comments t))
     (when-let ((str-start (nth 8 (syntax-ppss (point)))))
@@ -161,18 +184,26 @@ Return new position if changed, nil otherwise."
         nil))))
 
 (defun tray-builder-elisp-forward-sexp (&optional arg)
-  "Move forward across ARG balanced group of parentheses.
-Return new position if changed, nil otherwise."
+  "Move forward over a balanced expression.
+
+Optional argument ARG is the numeric argument specifying the number of sexps to
+move forward; it defaults to 1."
   (tray-builder-move-with 'forward-sexp arg))
 
 (defun tray-builder-safe-substring (len word)
-  "Substring WORD from zero to LEN."
+  "Extract a substring without properties up to length LEN.
+
+Argument LEN is the maximum number of characters to include in the substring.
+
+Argument WORD is the string from which the substring is extracted."
   (if (> (length word) len)
       (substring-no-properties word 0 len)
     word))
 
 (defun tray-builder-capitalize-variants (word)
-  "Return list of words of WORD, but it with upcased letter."
+  "Generate capitalized variants of WORD.
+
+Argument WORD is a string to generate capitalized variants from."
   (let ((cands)
         (parts (split-string word "" t)))
     (dotimes (i (length parts))
@@ -188,7 +219,12 @@ Return new position if changed, nil otherwise."
     (reverse cands)))
 
 (defun tray-builder-get-all-key-strategies (word len)
-  "Generate preffered shortcut from WORD with length LEN."
+  "Generate key strategies from a given WORD and length.
+
+Argument WORD is a string to be processed.
+
+Argument LEN is an integer representing the desired length of the output
+strings."
   (let* ((parts (append (split-string word "[^a-z]" t)
                         (list (replace-regexp-in-string "[^a-z]" "" word))))
          (parts-len (length parts))
@@ -229,10 +265,7 @@ Return new position if changed, nil otherwise."
                  (number-sequence 1 (min len parts-len))))))))
 
 (defun tray-builder-minor-modes ()
-  "List minor modes and their details.
-
-Return a list of minor modes, each represented as a list containing the mode
-function, variable, global status, and enabled state."
+  "List active minor modes and their details."
   (mapcan
    (lambda (fn)
      (let ((var (and (boundp fn)
@@ -267,12 +300,12 @@ function, variable, global status, and enabled state."
    (sort minor-mode-list #'string<)))
 
 (defun tray-builder-global-minor-modes ()
-  "Return list of global minor modes."
+  "List global minor modes using `tray-builder-minor-modes'."
   (seq-filter (pcase-lambda (`(,_fn ,_var ,global . _rest)) global)
               (tray-builder-minor-modes)))
 
 (defun tray-builder-non-global-minor-modes ()
-  "Filter non-global minor modes from a list."
+  "List non-global minor modes from `tray-builder-minor-modes'."
   (seq-filter (pcase-lambda (`(,_fn ,_var ,global . _rest))
                 (not global))
               (tray-builder-minor-modes)))
@@ -281,15 +314,18 @@ function, variable, global status, and enabled state."
 
 (defun tray-builder-generate-shortcuts (items &optional key-fn value-fn
                                               used-keys)
-  "Generate shortcuts from list of ITEMS.
-If KEY-FN is nil, ITEMS should be list of strings or symbols.
-If KEY-FN is a function, it will be called with every item of list, and should
-return string that will be as basis for shortcut.
-If VALUE-FN is nil, result is an alist of generated keys and corresponding
-items.
-If VALUE-FN is non nil, return a list of results of calling VALUE-FN with two
-arguments - generated shortcut and item.
-USED-KEYS is a list of keys that shouldn't be used."
+  "Generate shortcuts for ITEMS using optional KEY-FN and VALUE-FN.
+
+Argument ITEMS is a list of items to generate shortcuts for.
+
+Optional argument KEY-FN is a function that takes an item and returns a string
+to be used as the key.
+
+Optional argument VALUE-FN is a function that takes a key and a value, and
+returns a new value to be associated with the key.
+
+Optional argument USED-KEYS is a list of strings representing keys that are
+already in use and should not be generated again."
   (let* ((value-fn (or value-fn (lambda (key value)
                                   (if (proper-list-p value)
                                       (append (list key) value)
@@ -370,7 +406,12 @@ USED-KEYS is a list of keys that shouldn't be used."
       (reverse result))))
 
 (defun tray-builder-generate-key (flag &optional used-keys)
-  "Generate key for option FLAG that not present in USED-KEYS."
+  "Generate a unique key based on FLAG and USED-KEYS.
+
+Argument FLAG is a string representing the flag for which to generate a key.
+
+Optional argument USED-KEYS is a list of strings representing keys that are
+already in use and should be avoided."
   (let ((pred (apply-partially #'tray-builder-shortcut-pred used-keys))
         (parts (split-string flag "" t)))
     (or (seq-find
@@ -395,7 +436,9 @@ USED-KEYS is a list of keys that shouldn't be used."
         "")))
 
 (defun tray-builder-shorten-key-description (binding)
-  "Return short version of BINDING."
+  "Shorten key descriptions, excluding mouse bindings.
+
+Argument BINDING is a string representing a key sequence to be shortened."
   (when-let* ((parts
                (unless (string-match-p "mouse" binding)
                  (split-string binding nil t))))
@@ -405,7 +448,11 @@ USED-KEYS is a list of keys that shouldn't be used."
         binding))))
 
 (defun tray-builder-shorten-name (name shared-prefix)
-  "Trim SHARED-PREFIX from NAME."
+  "Shorten NAME by removing SHARED-PREFIX and extra hyphens.
+
+Argument NAME is the string to be shortened.
+
+Argument SHARED-PREFIX is the prefix to be removed from NAME if present."
   (if (and shared-prefix
            name
            (and (string-prefix-p shared-prefix name)))
@@ -416,11 +463,15 @@ USED-KEYS is a list of keys that shouldn't be used."
     name))
 
 (defun tray-builder-name-to-doc (name)
-  "Capitalize and remove all non alphapetical chars from NAME."
+  "Capitalize and join words in NAME, splitting on non-alpha characters.
+
+Argument NAME is a string to be converted to documentation text."
   (capitalize (string-join (split-string name "[^a-z]+" t) " ")))
 
 (defun tray-builder-find-longest-prefix (strings)
-  "Return longest common prefix in STRINGS."
+  "Find the longest common prefix in a list of STRINGS.
+
+Argument STRINGS is a list of strings to find the longest common prefix."
   (setq strings (seq-sort-by #'length '> strings))
   (seq-reduce (lambda (acc it)
                 (if-let ((shared (tray-builder-shared-start acc it)))
@@ -430,11 +481,15 @@ USED-KEYS is a list of keys that shouldn't be used."
 
 (defun tray-builder-commands-alist-to-transient (commands &optional short-descr
                                                           generate-keys)
-  "Generate transient body from COMMANDS.
-GENERATE-KEYS
-IF SHORT-DESCR is non nil, use short descriptions.
-COMMANDS should be either list of symbols,
-or alist of keys and symbols."
+  "Convert command alist to transient menu structure.
+
+Argument COMMANDS is a list of symbols or lists representing commands.
+
+Optional argument SHORT-DESCR is a boolean flag; when non-nil, it indicates to
+use short descriptions for commands.
+
+Optional argument GENERATE-KEYS is a boolean flag; when non-nil, it indicates to
+generate keys for COMMANDS automatically."
   (let ((used-keys)
         (line)
         (shared-prefix
@@ -442,16 +497,15 @@ or alist of keys and symbols."
           (remove nil
                   (mapcar
                    (lambda (it)
-                     (when-let
-                         ((symb
-                           (pcase it
-                             ((pred (symbolp))
-                              it)
-                             ((pred (proper-list-p))
-                              (seq-find #'symbolp it))
-                             ((pred consp)
-                              (seq-find #'symbolp (list (car it)
-                                                        (cdr it)))))))
+                     (when-let ((symb
+                                 (pcase it
+                                   ((pred (symbolp))
+                                    it)
+                                   ((pred (proper-list-p))
+                                    (seq-find #'symbolp it))
+                                   ((pred consp)
+                                    (seq-find #'symbolp (list (car it)
+                                                              (cdr it)))))))
                        (symbol-name symb)))
                    commands))))
         (result))
@@ -541,7 +595,9 @@ or alist of keys and symbols."
 
 
 (defun tray-builder-read-description (fn)
-  "Read description for FN."
+  "Prompt for a description of FN with default from documentation.
+
+Argument FN is the function for which to read the description."
   (let ((doc (replace-regexp-in-string
               "\\.$"
               ""
@@ -564,7 +620,11 @@ or alist of keys and symbols."
 
 ;;;###autoload
 (defun tray-builder-hydra-to-transient (begin end)
-  "Copy region with hydra heads between BEGIN and END as transient commands."
+  "Convert hydra to transient command vector.
+
+Argument BEGIN is the position of the beginning of the region in the buffer.
+
+Argument END is the position of the end of the region in the buffer."
   (interactive "r")
   (let ((sexps (cadar
                 (read-from-string (concat "(progn ("
@@ -599,7 +659,9 @@ or alist of keys and symbols."
     result))
 
 (defun tray-builder-parse-line (line-string)
-  "Try to extract key, command and description from LINE-STRING."
+  "Parse and split LINE-STRING into components.
+
+Argument LINE-STRING is a string representing a line to be parsed."
   (setq line-string (substring-no-properties line-string))
   (setq line-string (if (and (string-match-p "^[(]" line-string)
                              (string-match-p "[)]$" line-string))
@@ -653,7 +715,9 @@ or alist of keys and symbols."
               symb)))))
 
 (defun tray-builder-prettify-vector (result)
-  "Return pretty string for vector RESULT."
+  "Prettify a vector RESULT into a readable string format.
+
+Argument RESULT is the vector to be prettified."
   (with-temp-buffer
     (let ((emacs-lisp-mode-hook nil))
       (emacs-lisp-mode)
@@ -669,7 +733,9 @@ or alist of keys and symbols."
     (buffer-string)))
 
 (defun tray-builder-prettify-vectors (vectors)
-  "Return pretty string from VECTORS."
+  "Prettify VECTORS or a single vector into strings.
+
+Argument VECTORS is a list of vectors or a single vector to be prettified."
   (if (seq-find #'vectorp (if (listp vectors)
                               vectors
                             (append vectors nil)))
@@ -684,7 +750,11 @@ or alist of keys and symbols."
                                     (apply #'vector vectors)))))
 
 (defun tray-builder--from-region-lines (beg end)
-  "Generate body for transient prefix from region between BEG and END."
+  "Transform region lines into a vector with unique keys.
+
+Argument BEG is the beginning position of the region.
+
+Argument END is the ending position of the region."
   (when-let* ((lines
                (when (and beg end)
                  (split-string (buffer-substring-no-properties
@@ -727,14 +797,14 @@ or alist of keys and symbols."
                        result)))))
 
 (defun tray-builder--alistp (list)
-  "Return T if LIST is an association list."
+  "Check if LIST is a proper alist.
+
+Argument LIST is a proper list to be checked if it is an alist."
   (and (proper-list-p list)
        (seq-every-p #'consp list)))
 
 (defun tray-builder-read-top-level-lists ()
-  "Return all Lisp lists at outermost position in current buffer.
-An \"outermost position\" means one that it is outside of any syntactic entity:
-outside of any parentheses, comments, or strings encountered in the scan."
+  "Parse and collect top-level s-expressions from buffer."
   (let ((sexps)
         (sexp))
     (goto-char (point-min))
@@ -743,14 +813,11 @@ outside of any parentheses, comments, or strings encountered in the scan."
     (reverse sexps)))
 
 (defun tray-builder--from-region (beg end)
-  "Extract commands from a region to build a transient.
+  "Convert region between BEG and END into a transient command vector.
 
 Argument BEG is the beginning position of the region.
 
-Argument END is the ending position of the region.
-
-Generate a vector representing a transient command structure based on the region
-between BEG and END."
+Argument END is the ending position of the region."
   (let* ((sexps (save-excursion
                   (save-restriction
                     (narrow-to-region beg end)
@@ -769,35 +836,36 @@ between BEG and END."
 (defun tray-builder--substitute-map (sym &optional full shadow prefix title
                                          with-menu transl always-title
                                          mention-shadow buffer)
-  "Return a description of the key bindings in SYM.
-This is followed by the key bindings of all maps reachable
-through STARTMAP.
+  "Substitute keymap symbols with their values in a temporary buffer.
 
-If FULL is non-nil, don't omit certain uninteresting commands
-\(such as `undefined').
+Argument SYM is a keymap, a string naming a symbol, or a symbol whose value is a
+keymap.
 
-If SHADOW is non-nil, it is a list of maps; don't mention keys
-which would be shadowed by any of them.
+Optional argument FULL is a boolean; when non-nil, it includes inherited
+keymaps.
 
-If PREFIX is non-nil, mention only keys that start with PREFIX.
-IF WITH-MENU is non-nil, include menu items.
-If TITLE is non-nil, is a string to insert at the beginning.
-TITLE should not end with a colon or a newline; we supply that.
+Optional argument SHADOW is a boolean; when non-nil, it shows keys that are
+shadowed by higher-precedence maps.
 
-If NOMENU is non-nil, then don't omit menu-bar commands.
+Optional argument PREFIX is a string or a vector of events to be used as a
+PREFIX for keys in the keymap.
 
-If TRANSL is non-nil, the definitions are actually key
-translations so print strings and vectors differently.
+Optional argument TITLE is a string used as the title of the keymap description.
 
-If ALWAYS-TITLE is non-nil, print the title even if there are no
-maps to look through.
+Optional argument WITH-MENU is a boolean; when non-nil, it includes menu
+bindings.
 
-If MENTION-SHADOW is non-nil, then when something is shadowed by
-SHADOW, don't omit it; instead, mention it but say it is
-shadowed.
+Optional argument TRANSL is a boolean; when non-nil, it translates keys to their
+ASCII equivalents.
 
-If BUFFER, lookup keys while in that buffer.  This only affects
-things like :filters for menu bindings."
+Optional argument ALWAYS-TITLE is a boolean; when non-nil, it forces the display
+of the TITLE even if it would normally be omitted.
+
+Optional argument MENTION-SHADOW is a boolean; when non-nil, it mentions when a
+binding is shadowed by another map.
+
+Optional argument BUFFER is the buffer in which the keymap is active; defaults
+to the current buffer."
   (when-let ((value
               (cond ((keymapp sym)
                      sym)
@@ -824,9 +892,15 @@ things like :filters for menu bindings."
       (buffer-string))))
 
 (defun tray-builder-keymap-to-alist (keymap &optional filter &rest args)
-  "Format KEYMAP to alist.
-FILTER is called with key description and symbol.
-ARGS is the argument for `tray-builder--substitute-map'."
+  "Convert KEYMAP to alist, optionally filtering with FILTER and ARGS.
+
+Argument KEYMAP is a keymap object to be converted to an alist.
+
+Optional argument FILTER is a function that takes a key and command as arguments
+and returns non-nil if the key-command pair should be included in the output.
+
+Remaining arguments ARGS are additional arguments passed to the internal
+function `tray-builder--substitute-map'."
   (when-let* ((lines (ignore-errors (split-string (apply
                                                    #'tray-builder--substitute-map
                                                    (append
@@ -879,7 +953,10 @@ ARGS is the argument for `tray-builder--substitute-map'."
 
 
 (defun tray-builder-all-keymaps (&optional filter)
-  "Return alist of all keymaps filtered with FILTER."
+  "List all keymaps, optionally filtered.
+
+Optional argument FILTER is a predicate function to determine which keymaps to
+include."
   (let (maps)
     (mapatoms (lambda (sym)
                 (when-let ((value (and (boundp sym)
@@ -893,13 +970,15 @@ ARGS is the argument for `tray-builder--substitute-map'."
     maps))
 
 (defun tray-builder-get-major-modes ()
-  "Return all modes from `auto-mode-alist'."
+  "Filter and return unique major mode commands."
   (seq-filter #'commandp (seq-uniq (flatten-list (mapcar #'cdr auto-mode-alist)))))
 
 
 (defun tray-builder-get-minor-modes-commands (&optional active)
-  "Generate prefixes from `minor-mode-map-alist'.
-If ACTIVE is non nil, return bodies only for active modes."
+  "List minor mode commands for transient display.
+
+Optional argument ACTIVE is a boolean flag indicating whether to include only
+ACTIVE minor modes. If nil, all minor modes are included."
   (let ((active-modes (seq-filter #'symbol-value (mapcar #'car
                                                          minor-mode-alist))))
     (append (remove nil
@@ -925,7 +1004,9 @@ If ACTIVE is non nil, return bodies only for active modes."
 
 ;;;###autoload
 (defun tray-builder-kill-from-commands (commands)
-  "Generate transient body from COMMANDS."
+  "Copy selected COMMANDS to the kill ring.
+
+Argument COMMANDS is a list of command symbols to be processed."
   (interactive (list (mapcar #'intern (completing-read-multiple
                                        "Command "
                                        (let (maps)
@@ -943,7 +1024,9 @@ If ACTIVE is non nil, return bodies only for active modes."
 
 ;;;###autoload
 (defun tray-builder-kill-commands-from-keymap (keymap)
-  "Generate transient body from KEYMAP."
+  "Extract and copy KEYMAP commands to kill ring.
+
+Argument KEYMAP is a symbol representing the keymap to extract commands from."
   (interactive (list (symbol-value
                       (intern (completing-read
                                "Keymap: "
@@ -963,7 +1046,7 @@ If ACTIVE is non nil, return bodies only for active modes."
 
 ;;;###autoload
 (defun tray-builder-kill-from-minor-modes ()
-  "Copy body for `transient-define-prefix' from all minor modes."
+  "Copy minor mode commands to the kill ring."
   (interactive)
   (kill-new
    (tray-builder-prettify-vectors (tray-builder-get-minor-modes-commands)))
@@ -971,7 +1054,7 @@ If ACTIVE is non nil, return bodies only for active modes."
 
 ;;;###autoload
 (defun tray-builder-kill-from-active-minor-modes ()
-  "Copy body for `transient-define-prefix' from currently active minor modes."
+  "Copy active minor modes' commands to the kill ring."
   (interactive)
   (let ((cmds (tray-builder-get-minor-modes-commands t)))
     (pp cmds)
@@ -981,7 +1064,13 @@ If ACTIVE is non nil, return bodies only for active modes."
 
 ;;;###autoload
 (defun tray-builder-kill-from-region-lines (&optional beg end)
-  "Generate body for transient prefix from region lines between BEG and END."
+  "Kill lines from region to build a transient.
+
+Optional argument BEG is the beginning position of the region; it defaults to
+the current region's beginning if not provided.
+
+Optional argument END is the ending position of the region; it defaults to the
+current region's END if not provided."
   (interactive "r")
   (tray-builder--from-region
    (or
@@ -990,8 +1079,7 @@ If ACTIVE is non nil, return bodies only for active modes."
    (or end (region-end))))
 
 (defun tray-builder-get-local-commands ()
-  "Return prefixes from `minor-mode-map-alist'.
-If ACTIVE is non nil, return bodies only for active modes."
+  "Extract commands from the current local keymap."
   (tray-builder-commands-alist-to-transient
    (seq-filter (lambda (it)
                  (commandp
@@ -1000,7 +1088,10 @@ If ACTIVE is non nil, return bodies only for active modes."
                 (current-local-map)))))
 
 (defun tray-builder-take-description (item)
-  "Return description from transient ITEM."
+  "Extract description from ITEM if present.
+
+Argument ITEM is a proper list representing the item to take the description
+from."
   (when (proper-list-p item)
     (if (stringp (nth 1 item))
         (nth 1 item)
@@ -1014,14 +1105,23 @@ If ACTIVE is non nil, return bodies only for active modes."
           d)))))
 
 (defun tray-builder-take-key (item)
-  "Return key from transient ITEM."
+  "Extract the first element of ITEM if it's a string.
+
+Argument ITEM is the element from which to extract the key, expected to be a
+cons cell or list with a string as its first element."
   (when (stringp (car-safe item))
     (car item)))
 
 (defun tray-builder-group-vectors (arguments &optional height win-width)
-  "Group ARGUMENTS into vector.
-Default value for HEIGHT is `max-mini-window-height',
-and for WIN-WIDTH - window width."
+  "Group ARGUMENTS into vectors based on HEIGHT and WIN-WIDTH.
+
+Argument ARGUMENTS is a list of items to be grouped into vectors.
+
+Optional argument HEIGHT is the maximum number of lines for the display; it
+defaults to a fraction of `max-mini-window-height'.
+
+Optional argument WIN-WIDTH is the width of the window in characters; it
+defaults to the current window width."
   (let* ((descriptions
           (sort
            (mapcar #'(lambda
@@ -1059,9 +1159,9 @@ and for WIN-WIDTH - window width."
 
 
 (defun tray-builder-map-modes-to-prefixes (modes)
-  "Map MODES to prefix shortcuts.
+  "Map major MODES to keyboard shortcuts.
 
-Argument MODES is a list of modes to map to prefixes."
+Argument MODES is a list of mode symbols to map to prefixes."
   (let* ((maxwidth
           (min (length
                 (seq-sort-by (pcase-lambda (`(,mode . ,_rest))
@@ -1115,7 +1215,7 @@ Argument MODES is a list of modes to map to prefixes."
 
 ;;;###autoload (autoload 'tray-builder-eval-toggle-minor-mode-prefix "tray-builder" nil t)
 (transient-define-prefix tray-builder-eval-toggle-minor-mode-prefix ()
-  "Toggle minor modes with dynamic shortcuts."
+  "Toggle global or local minor modes dynamically."
   [:setup-children
    (lambda (&rest _argsn)
      (mapcar
@@ -1143,7 +1243,7 @@ Argument MODES is a list of modes to map to prefixes."
 
 ;;;###autoload
 (defun tray-builder-dwim ()
-  "Show menu with relevant local commands and their real keybindings."
+  "Show a menu with relevant local commands and keybindings."
   (interactive)
   (call-interactively (tray-builder-eval-dynamic-eval
                        "tray-builder-active-modes"
@@ -1168,7 +1268,11 @@ Argument MODES is a list of modes to map to prefixes."
 
 
 (defun tray-builder-eval-dynamic-eval (name body)
-  "Eval and call transient prefix with NAME and BODY."
+  "Evaluate BODY and define transient prefix NAME dynamically.
+
+Argument NAME is a string or symbol that names the transient command.
+
+Argument BODY is a list of forms that define the transient command."
   (when (stringp name)
     (setq name (make-symbol name)))
   (eval `(progn
@@ -1183,7 +1287,7 @@ Argument MODES is a list of modes to map to prefixes."
 
 ;;;###autoload (autoload 'tray-builder-menu "tray-builder" nil t)
 (transient-define-prefix tray-builder-menu ()
-  "Generate transient prefixes from region or with commands."
+  "Display menu to generate transient commands."
   ["Generate prefix commands from "
    ("k" "Keymap" tray-builder-kill-commands-from-keymap)
    ("r" "Region lines" tray-builder-kill-from-region-lines
