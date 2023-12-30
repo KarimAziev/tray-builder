@@ -30,6 +30,8 @@
 
 ;;; Code:
 
+
+
 (defcustom tray-builder-transient-doc-regexp-words '("forward"
                                                      "backward"
                                                      "up"
@@ -80,6 +82,30 @@ actions."
                                          (:inapt-if-not (function))
                                          (:inapt-if-nil (variable))
                                          (:inapt-if-non-nil (variable))))
+
+(defun tray-builder--make-toggled-description (mode &optional description align)
+  "Concat DESCRIPTION for MODE with colorized suffixes ON-LABEL and OFF-LABEL."
+  (lambda ()
+    (concat
+     (propertize
+      (or
+       description
+       (when-let ((doc (replace-regexp-in-string
+                        "-" " " (capitalize (symbol-name
+                                             mode)))))
+         (replace-regexp-in-string "\\.$" ""
+                                   (car
+                                    (split-string doc "\n" nil)))))
+      'face
+      (if
+          (and (boundp mode)
+               (symbol-value mode))
+          'success nil))
+     (propertize " " 'display
+                 (list 'space :align-to (or align 32)))
+     (if (and (boundp mode)
+              (symbol-value mode))
+         "[X]" "[ ]"))))
 
 (defcustom tray-builder-align-toggle-num 35
   "Number of spaces for alignment in tray builder toggles.
@@ -1526,29 +1552,6 @@ Argument BODY is a list of forms that define the transient command."
                               nil
                               "Copied transient commands")))
 
-(defun tray-builder--make-toggled-description (mode &optional description align)
-  "Concat DESCRIPTION for MODE with colorized suffixes ON-LABEL and OFF-LABEL."
-  (lambda ()
-    (concat
-     (propertize
-      (or
-       description
-       (when-let ((doc (replace-regexp-in-string
-                        "-" " " (capitalize (symbol-name
-                                             mode)))))
-         (replace-regexp-in-string "\\.$" ""
-                                   (car
-                                    (split-string doc "\n" nil)))))
-      'face
-      (if
-          (and (boundp mode)
-               (symbol-value mode))
-          'success nil))
-     (propertize " " 'display
-                 (list 'space :align-to (or align 32)))
-     (if (and (boundp mode)
-              (symbol-value mode))
-         "[X]" "[ ]"))))
 
 (defun tray-builder--format-menu-heading (title &optional note)
   "Format TITLE as a menu heading.
