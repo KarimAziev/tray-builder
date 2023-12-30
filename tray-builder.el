@@ -61,6 +61,221 @@ actions."
   :type '(repeat string)
   :group 'tray-builder)
 
+(defvar tray-builder-transient-options '((:level (integer 1))
+                                         (:transient (boolean))
+                                         (:show-help (function))
+                                         (:face (face))
+                                         (:inapt-face (face))
+                                         (:if (function))
+                                         (:inapt-if-not-mode (symbol))
+                                         (:inapt-if-mode (symbol))
+                                         (:inapt-if-derived (symbol))
+                                         (:inapt-if-not-derived (symbol))
+                                         (:if-not-derived (symbol))
+                                         (:if-not-mode (symbol))
+                                         (:if-mode (symbol))
+                                         (:if-derived (symbol))
+                                         (:if-nil (variable))
+                                         (:if-non-nil (variable))
+                                         (:inapt-if-not (function))
+                                         (:inapt-if-nil (variable))
+                                         (:inapt-if-non-nil (variable))))
+
+(defcustom tray-builder-align-toggle-num 35
+  "Number of spaces for alignment in tray builder toggles.
+
+Specifies the number of characters to use for alignment when toggling display
+options in the tray builder.
+
+The value is an integer that determines the column width for aligning toggle
+descriptions. This alignment affects how toggle descriptions are displayed when
+the tray builder generates toggle suffixes.
+
+Increasing the value will result in more space between the toggle key and its
+description, while decreasing the value will reduce the space. Adjust this value
+to achieve the desired visual alignment in the tray builder's display.
+
+The default value is 35. Adjust this value according to the width of the window
+or personal preference for the appearance of the tray builder's toggle display."
+  :group 'tray-builder
+  :type 'integer)
+
+(defcustom tray-builder-toggle-suffixes `((display-line-numbers-mode
+                                           :key "l")
+                                          (visual-line-mode :key "v")
+                                          (whitespace-mode :description
+                                           "Show Whitespaces")
+                                          (dimmer-extra-transient
+                                           :description
+                                           "Highlight selected buffers"
+                                           :if-require (dimmer-extra))
+                                          (repeat-mode)
+                                          (visual-fill-column-mode
+                                           :description
+                                           "Visual Fill Column")
+                                          (page-break-lines-mode
+                                           :description
+                                           "Hide ^L characters")
+                                          (rainbow-mode :description
+                                           "Highlight colors")
+                                          (hl-line-mode
+                                           :description
+                                           "Highlight the current line")
+                                          (hl-todo-mode :description
+                                           "Highlight TODO words")
+                                          (toggle-truncate-lines
+                                           :key "t"
+                                           :description
+                                           "Truncate long lines"
+                                           :variable-indicator truncate-lines)
+                                          (marginalia-mode :key "A")
+                                          (minibuffer-auto-mode :key "M")
+                                          (minibuffer-auto-preview-mode :key
+                                           "R")
+                                          (minibuffer-auto-crm-mode :key "m")
+                                          (icomplete-mode :key "I")
+                                          (fido-mode :key "F")
+                                          (fido-vertical-mode :key "V")
+                                          (ivy-mode :key "i")
+                                          (counsel-mode :if-require (counsel))
+                                          (auto-fill-mode :description
+                                           ,(tray-builder--make-toggled-description
+                                             'auto-fill-function
+                                             (concat "Auto Wrapping at column "
+                                              (propertize
+                                               (format
+                                                "%s"
+                                                fill-column)
+                                               'face
+                                               'font-lock-keyword-face))
+                                             (* tray-builder-align-toggle-num 2)))
+                                          (emmet-mode :key "E")
+                                          (toggle-debug-on-error
+                                           :key "d"
+                                           :variable-indicator debug-on-error
+                                           :description
+                                           "Debug on error")
+                                          (toggle-debug-on-quit
+                                           :key "X"
+                                           :variable-indicator debug-on-quit)
+                                          (transient-toggle-debug
+                                           :key "O"
+                                           :variable-indicator transient--debug)
+                                          (treesit-inspect-mode
+                                           :if
+                                           (lambda ()
+                                             (fboundp 'treesit-inspect-mode))
+                                           :description
+                                           (lambda () "Tree sit inspect")
+                                           :inapt-if-not (lambda ()
+                                                           (derived-mode-p
+                                                            'c-ts-mode
+                                                            'cmake-ts-mode
+                                                            'cpp-ts-mode
+                                                            'css-ts-mode
+                                                            'dockerfile-ts-mode
+                                                            'elixir-ts-mode
+                                                            'go-ts-mode
+                                                            'html-ts-mode
+                                                            'java-ts-mode
+                                                            'tsx-ts-mode
+                                                            'typescript-ts-mode
+                                                            'json-ts-mode
+                                                            'julia-ts-mode
+                                                            'kotlin-ts-mode
+                                                            'python-ts-mode
+                                                            'ruby-ts-mode
+                                                            'rust-ts-mode
+                                                            'toml-ts-mode
+                                                            'yaml-ts-mode
+                                                            'json-ts-mode
+                                                            'c++-ts-mode)))
+                                          (helm-mode :if-require (helm))
+                                          (org-toggle-inline-images
+                                           :if-derived
+                                           org-mode
+                                           :variable-indicator
+                                           org-inline-image-overlays))
+  "List of toggle commands with optional keys and descriptions.
+
+A list of toggle commands and their associated properties for use in the tray
+builder interface. Each entry in the list is a cons cell with the toggle command
+as the car and a property list as the cdr.
+
+The property list can contain the following keys:
+
+- :key - A string representing a single-character keybinding for the toggle
+command.
+- :description - A string or a function that returns a string, providing a
+  description for the toggle command.
+- :variable-indicator - A symbol representing a variable that indicates the
+  toggle state.
+- :if-require - A list of symbols representing required features for the toggle
+  command to be available.
+- :if-derived - A symbol representing a major mode that the current buffer must
+  be derived from for the toggle to be applicable.
+- :inapt-if-not - A function that determines if the toggle command is
+  inapplicable based on thea current buffer's context.
+
+Entries without a :key will not have a keybinding in the tray builder interface.
+Entries without a :description will use the default description generated by the
+tray builder. If :variable-indicator is provided, its value will be used to
+indicate the toggle state instead of the command's return value. If :if-require
+is provided, the toggle command will only be available if all listed features
+are loaded. If :if-derived is provided, the toggle will only be applicable if
+the current buffer is derived from the specified major mode. If :inapt-if-not is
+provided, the function will be called to determine the applicability of the
+toggle command.
+
+The default value is an alist where each element specifies a toggle command and
+its associated properties for customization."
+  :group 'tray-builder
+  :type
+  `(alist
+    :key-type (symbol :tag "Command" ignore)
+    :value-type
+    (plist
+     :options
+     (((const
+        :format "%v "
+        :description)
+       (radio
+        (string)
+        (function ignore)))
+      ((const
+        :format "%v "
+        :variable-indicator)
+       (variable))
+      ((const
+        :format "%v "
+        :if-require)
+       (repeat symbol))
+      ((const
+        :format "%v "
+        :key)
+       (string))
+      ,@(mapcar (lambda (it)
+                  `((const
+                     :format "%v "
+                     ,(car it))
+                    ,(cadr it)))
+         tray-builder-transient-options)))))
+
+(defun tray-builder--plist-pick (keywords pl)
+  "Extract specified keys and values from a property list.
+
+Argument KEYWORDS is a list of keys to pick from the property list.
+
+Argument PL is the property list from which values associated with KEYWORDS are
+picked."
+  (let ((result)
+        (keyword))
+    (while (setq keyword (pop keywords))
+      (when (plist-member pl keyword)
+        (let ((value (plist-get pl keyword)))
+          (setq result (append result (list keyword value))))))
+    result))
+
 (defvar tray-builder-exclude-cmds
   '(ignore
     self-insert-command
@@ -1310,6 +1525,309 @@ Argument BODY is a list of forms that define the transient command."
                                 (point))
                               nil
                               "Copied transient commands")))
+
+(defun tray-builder--make-toggled-description (mode &optional description align)
+  "Concat DESCRIPTION for MODE with colorized suffixes ON-LABEL and OFF-LABEL."
+  (lambda ()
+    (concat
+     (propertize
+      (or
+       description
+       (when-let ((doc (replace-regexp-in-string
+                        "-" " " (capitalize (symbol-name
+                                             mode)))))
+         (replace-regexp-in-string "\\.$" ""
+                                   (car
+                                    (split-string doc "\n" nil)))))
+      'face
+      (if
+          (and (boundp mode)
+               (symbol-value mode))
+          'success nil))
+     (propertize " " 'display
+                 (list 'space :align-to (or align 32)))
+     (if (and (boundp mode)
+              (symbol-value mode))
+         "[X]" "[ ]"))))
+
+(defun tray-builder--format-menu-heading (title &optional note)
+  "Format TITLE as a menu heading.
+When NOTE is non-nil, append it the next line."
+  (let ((no-wb (= (frame-bottom-divider-width) 0)))
+    (format "%s%s%s"
+            (propertize title 'face `(:inherit font-lock-constant-face
+                                      :overline ,no-wb)
+                        'display '((height 1.1)))
+            (propertize " " 'face `(:inherit font-lock-constant-face
+                                    :overline ,no-wb)
+                        'display '(space :align-to right))
+            (propertize (if note (concat "\n" note) "") 'face
+                        'font-lock-doc-face))))
+
+(defvar tray-builder--boolean-variable-history nil)
+
+;;;###autoload
+(defun tray-builder-toggle-custom-boolean-var (sym)
+  "Toggle the boolean value of a given symbol.
+
+Argument SYM is a symbol whose value is to be toggled."
+  (interactive
+   (list
+    (let ((vals)
+          (curr-sym
+           (let ((result))
+             (save-excursion
+               (with-syntax-table emacs-lisp-mode-syntax-table
+                 (while (progn
+                          (setq result
+                                (let ((sexp
+                                       (sexp-at-point)))
+                                  (pcase sexp
+                                    (`(defcustom ,(and (pred (symbolp))
+                                                   symb-name
+                                                   (guard (not (memq symb-name '(t nil)))))
+                                        ,(or 't 'nil)
+                                        ,(pred (stringp))
+                                        . ,_pl)
+                                     symb-name))))
+                          (and (not result)
+                               (let ((parse-sexp-ignore-comments
+                                      t)
+                                     (pos (point)))
+                                 (when-let ((str-start
+                                             (nth 8
+                                                  (syntax-ppss
+                                                   (point)))))
+                                   (goto-char str-start))
+                                 (condition-case nil
+                                     (progn
+                                       (backward-up-list 1)
+                                       t)
+                                   (error (goto-char pos)
+                                          nil))))))))
+             result))
+          (initial-input))
+      (mapatoms
+       (lambda (s)
+         (if-let ((ctype
+                   (and
+                    (symbolp
+                     s)
+                    (ignore-errors
+                      (get s 'custom-type)))))
+             (pcase ctype
+               ('boolean
+                (when (eq curr-sym s)
+                  (setq initial-input (symbol-name curr-sym)))
+                (push
+                 (list s
+                       (get s 'variable-documentation)
+                       (symbol-value s))
+                 vals)))
+           (when (and (symbolp s)
+                      (boundp s)
+                      (string-match-p (symbol-name s) "-debug$"))
+             (let ((value (symbol-value s)))
+               (when (or (eq value t)
+                         (not value))
+                 (push
+                  (list s
+                        (get s 'variable-documentation)
+                        value)
+                  vals)))))))
+      (let* ((alist vals)
+             (strs
+              (seq-sort-by (lambda (str)
+                             (cond ((and initial-input
+                                         (string= initial-input str))
+                                    -1)
+                                   ((member str
+                                            tray-builder--boolean-variable-history)
+                                    0)
+                                   (t (string-to-char str))))
+                           #'<
+                           (mapcar
+                            (pcase-lambda
+                              (`(,k .
+                                 ,_))
+                              (substring-no-properties
+                               (symbol-name
+                                k)))
+                            vals)))
+             (len (apply #'max (mapcar (pcase-lambda (`(,k . ,_))
+                                         (length (symbol-name k)))
+                                       vals)))
+             (annotf (lambda (str)
+                       (pcase-let
+                           ((`(,doc ,value)
+                             (cdr (assq (intern str) alist))))
+                         (concat
+                          (propertize " " 'display `(space :align-to
+                                                     ,(1+ len)))
+                          (if value "[X]" "[ ]")
+                          " "
+                          (truncate-string-to-width
+                           (string-join
+                            (split-string
+                             (if
+                                 (stringp
+                                  doc)
+                                 doc
+                               "")
+                             "[\t\n\r\f]")
+                            " ")
+                           (- (window-width)
+                              (+ 10 len))))))))
+        (intern
+         (completing-read "Toggle: "
+                          (lambda (str pred action)
+                            (if (eq action 'metadata)
+                                `(metadata
+                                  (annotation-function .
+                                   ,annotf))
+                              (complete-with-action action
+                                                    strs str
+                                                    pred)))
+                          nil t
+                          nil
+                          'tray-builder--boolean-variable-history))))))
+  (when (get sym 'custom-type)
+    (let ((val (symbol-value sym)))
+      (funcall (or (get sym 'custom-set) 'set-default) sym (not val)))))
+
+
+
+
+(defun tray-builder--make-toggle-suffix (cmd &optional variable description
+                                             align)
+  "Create a toggle suffix for a command.
+
+Argument CMD is the command to be toggled.
+
+Optional argument VARIABLE is the variable to be toggled.
+
+Optional argument DESCRIPTION is the description of the toggle.
+
+Optional argument ALIGN is the column to align the toggle's description."
+  (list cmd :description (tray-builder--make-toggled-description
+                          variable
+                          description
+                          align)))
+
+
+
+
+
+
+(defun tray-builder--get-filtered-toggle-suffixes ()
+  "Filter command suffixes based on requirements."
+  (seq-filter
+   (pcase-lambda (`(,cmd . ,v))
+     (and (or (not (plist-get v :if-require))
+              (not (seq-find (lambda (it)
+                               (not
+                                (require it nil t)))
+                             (plist-get v :if-require))))
+          (commandp cmd)))
+   tray-builder-toggle-suffixes))
+
+
+(defun tray-builder--generate-toggle-suffixes ()
+  "Generate a list of key-command-description mappings."
+  (let ((suffixes (tray-builder--get-filtered-toggle-suffixes))
+        (cmds)
+        (used-keys)
+        (generated)
+        (len))
+    (setq len (tray-builder--first-column-children-len suffixes))
+    (pcase-dolist (`(,cmd . ,pl)
+                   suffixes)
+      (if-let ((key (plist-get pl :key)))
+          (push key used-keys)
+        (push (cons cmd pl) cmds)))
+    (setq generated (tray-builder-generate-shortcuts cmds (lambda (it)
+                                                            (symbol-name (car it)))
+                                                     (lambda (key cell)
+                                                       (pcase-let*
+                                                           ((`(,cmd . ,pl)
+                                                             cell))
+                                                         (append (list
+                                                                  cmd
+                                                                  :key
+                                                                  key)
+                                                                 pl)))
+                                                     used-keys))
+    (seq-map-indexed
+     (lambda (item i)
+       (pcase-let ((`(,cmd . ,pl) item))
+         (let* ((key (or (plist-get pl :key)
+                         (plist-get (cdr (assq cmd generated)) :key)))
+                (descr (plist-get pl :description))
+                (tranprops (tray-builder--plist-pick
+                            (mapcar 'car
+                                    tray-builder-transient-options)
+                            pl)))
+           (append (list key cmd
+                         :description (if (functionp descr)
+                                          descr
+                                        (tray-builder--make-toggled-description
+                                         (or (plist-get pl :variable-indicator)
+                                             cmd)
+                                         descr
+                                         (if (>= i len)
+                                             (* 2 tray-builder-align-toggle-num)
+                                           tray-builder-align-toggle-num))))
+                   tranprops))))
+     suffixes)))
+
+(defvar tray-builder--mapped-suffixes nil)
+
+(defun tray-builder--first-column-children-len (items)
+  "Calculate half the length of ITEMS, rounded to nearest integer.
+
+Argument ITEMS is a list whose length is divided by 2 and rounded to the nearest
+integer."
+  (round (/
+          (float
+           (length
+            items))
+          2)))
+
+;;;###autoload (autoload 'tray-builder-toggle-menu "tray-builder" nil t)
+(transient-define-prefix tray-builder-toggle-menu ()
+  "Toggle menu options with dynamic entries from `tray-builder-toggle-suffixes'."
+  :refresh-suffixes t
+  :transient-suffix t
+  [[:description
+    "Toggle"
+    :setup-children
+    (lambda (_args)
+      (let ((group (seq-take tray-builder--mapped-suffixes
+                             (tray-builder--first-column-children-len
+                              tray-builder--mapped-suffixes))))
+        (transient-parse-suffixes
+         transient--prefix
+         (apply #'vector
+                group))))]
+   [:description ""
+    :setup-children
+    (lambda (_args)
+      (let ((group (seq-drop tray-builder--mapped-suffixes
+                             (tray-builder--first-column-children-len
+                              tray-builder--mapped-suffixes))))
+        (transient-parse-suffixes
+         transient--prefix
+         (apply #'vector
+                group))))]
+   ["Other"
+    ("." tray-builder-eval-toggle-minor-mode-prefix
+     :description
+     "Show all modes"
+     :transient nil)
+    ("!" "Toggle variable" tray-builder-toggle-custom-boolean-var :transient nil)]]
+  (interactive)
+  (setq tray-builder--mapped-suffixes (tray-builder--generate-toggle-suffixes))
+  (transient-setup 'tray-builder-toggle-menu))
 
 (provide 'tray-builder)
 ;;; tray-builder.el ends here
