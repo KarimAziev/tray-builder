@@ -1491,20 +1491,19 @@ Argument MODES is a list of mode symbols to map to prefixes."
                        `([,@(tray-builder-group-vectors
                              (tray-builder-commands-alist-to-transient
                               (append
-                               (or
-                                (tray-builder-keymap-to-alist
-                                 (current-local-map)
-                                 (lambda (_key value)
-                                   (not
-                                    (eq value
-                                        'tray-builder-dwim))))
-                                (when-let
-                                    ((sym
-                                      (tray-builder-help-fns--most-relevant-active-keymap)))
-                                  (tray-builder-keymap-to-alist
-                                   sym)))
+                               (tray-builder-keymap-to-alist
+                                (current-local-map)
+                                (lambda (_key value)
+                                  (not
+                                   (eq value
+                                    'tray-builder-dwim))))
+                               (when-let
+                                   ((sym
+                                     (tray-builder-help-fns--most-relevant-active-keymap)))
+                                 (tray-builder-keymap-to-alist
+                                  sym))
                                (list (cons "?"
-                                           'describe-mode)))
+                                      'describe-mode)))
                               t))]))))
 
 
