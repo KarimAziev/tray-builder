@@ -30,8 +30,6 @@
 
 ;;; Code:
 
-
-
 (defcustom tray-builder-transient-doc-regexp-words '("forward"
                                                      "backward"
                                                      "up"
@@ -333,10 +331,11 @@ Argument KEYMAP is a keymap to search for its variable name."
 
 (defun tray-builder-help-fns--most-relevant-active-keymap ()
   "Find the most relevant active keymap at point."
-  (tray-builder-help-fns-find-keymap-name (or (get-char-property (point) 'keymap)
-                         (if (get-text-property (point) 'local-map)
-                             (get-char-property (point) 'local-map)
-                           (current-local-map)))))
+  (tray-builder-help-fns-find-keymap-name (or
+                                           (get-char-property (point) 'keymap)
+                                           (if (get-text-property (point) 'local-map)
+                                               (get-char-property (point) 'local-map)
+                                             (current-local-map)))))
 
 (defun tray-builder-copy-as-string (result)
   "Copy formatted RESULT to clipboard and display it.
@@ -550,8 +549,6 @@ strings."
   (seq-filter (pcase-lambda (`(,_fn ,_var ,global . _rest))
                 (not global))
               (tray-builder-minor-modes)))
-
-
 
 (defun tray-builder-generate-shortcuts (items &optional key-fn value-fn
                                               used-keys)
@@ -832,8 +829,6 @@ generate keys for COMMANDS automatically."
             (push (list key doc symb :transient t) result)
           (push (list key doc symb) result))))
     result))
-
-
 
 (defun tray-builder-read-description (fn)
   "Prompt for a description of FN with default from documentation.
@@ -1153,23 +1148,25 @@ function `tray-builder--substitute-map'."
               (filtered (delq nil (mapcar
                                    (lambda
                                      (it)
-                                     (when-let* ((chars 	(and it
-                                                               (stringp it)
-                                                               (split-string it
-                                                                             "" t)))
-                                                 (key-chars
-                                                  (seq-take-while
-                                                   (lambda (c)
-                                                     (get-text-property
-                                                      0
-                                                      'face
-                                                      c))
-                                                   chars))
-                                                 (key (string-join key-chars ""))
-                                                 (cmd (intern-soft
-                                                       (string-trim (substring-no-properties
-                                                                     it (length
-                                                                         key))))))
+                                     (when-let*
+                                         ((chars         (and it
+                                                              (stringp it)
+                                                              (split-string it
+                                                                            ""
+                                                                            t)))
+                                          (key-chars
+                                           (seq-take-while
+                                            (lambda (c)
+                                              (get-text-property
+                                               0
+                                               'face
+                                               c))
+                                            chars))
+                                          (key (string-join key-chars ""))
+                                          (cmd (intern-soft
+                                                (string-trim (substring-no-properties
+                                                              it (length
+                                                                  key))))))
                                        (when (and (key-valid-p key)
                                                   (not (string-match-p
                                                         tray-builder-assist-exclude-regexps
@@ -1180,8 +1177,8 @@ function `tray-builder--substitute-map'."
                                                   (or (not filter)
                                                       (funcall filter key cmd)))
                                          (cons													(substring-no-properties
-                                                                         key)
-                                                                        cmd))))
+                                                                                                                                                 key)
+                                                                                                                                                cmd))))
                                    lines))))
     (seq-sort-by
      (lambda (a)
@@ -1190,8 +1187,6 @@ function `tray-builder--substitute-map'."
      (seq-uniq filtered (lambda (a b)
                           (eq (cdr a)
                               (cdr b)))))))
-
-
 
 (defun tray-builder-all-keymaps (&optional filter)
   "List all keymaps, optionally filtered.
@@ -1212,8 +1207,8 @@ include."
 
 (defun tray-builder-get-major-modes ()
   "Filter and return unique major mode commands."
-  (seq-filter #'commandp (seq-uniq (flatten-list (mapcar #'cdr auto-mode-alist)))))
-
+  (seq-filter #'commandp
+              (seq-uniq (flatten-list (mapcar #'cdr auto-mode-alist)))))
 
 (defun tray-builder-get-minor-modes-commands (&optional active)
   "List minor mode commands for transient display.
@@ -1261,7 +1256,6 @@ Argument COMMANDS is a list of command symbols to be processed."
       (progn (kill-new (tray-builder-prettify-vectors commands))
              (message "Copied"))
     (message "Couldn't extract commands")))
-
 
 ;;;###autoload
 (defun tray-builder-kill-commands-from-keymap (keymap)
@@ -1372,13 +1366,13 @@ defaults to the current window width."
                          #'(lambda
                              (&rest args)
                              (apply #'concat
-                                    (list
-                                     (apply
-                                      #'tray-builder-take-key
-                                      args)
-                                     (apply
-                                      #'tray-builder-take-description
-                                      args))))
+                              (list
+                               (apply
+                                #'tray-builder-take-key
+                                args)
+                               (apply
+                                #'tray-builder-take-description
+                                args))))
                          args)))
                    arguments)
            #'>))
@@ -1397,7 +1391,6 @@ defaults to the current window width."
      (lambda (it)
        (apply #'vector it))
      (seq-split arguments final))))
-
 
 (defun tray-builder-map-modes-to-prefixes (modes)
   "Map major MODES to keyboard shortcuts.
@@ -1434,25 +1427,22 @@ Argument MODES is a list of mode symbols to map to prefixes."
                                   "^Toggle[\s]\\|\\.$\\|-\\|Mode"
                                   (lambda (it)
                                     (pcase it
-                                      ("-" " ")
-                                      (_ "")))
+                                     ("-" " ")
+                                     (_ "")))
                                   (capitalize (symbol-name mode))))
                           (doc (truncate-string-to-width
                                 label
                                 ,maxwidth nil nil nil ".")))
-                     (if (and (boundp mode)
-                              (symbol-value mode))
-                         (propertize doc 'face 'success)
-                       doc)))
+                    (if (and (boundp mode)
+                         (symbol-value mode))
+                        (propertize doc 'face 'success)
+                      doc)))
                 :transient t)))))
          (groupped (mapcar
                     (lambda (it)
                       (apply #'vector it))
                     (seq-split all-modes (/ (length all-modes) 5)))))
     groupped))
-
-
-
 
 ;;;###autoload (autoload 'tray-builder-eval-toggle-minor-mode-prefix "tray-builder" nil t)
 (transient-define-prefix tray-builder-eval-toggle-minor-mode-prefix ()
@@ -1481,7 +1471,6 @@ Argument MODES is a list of mode symbols to map to prefixes."
                      `([,@groupped]))
                     sym)))))])
 
-
 ;;;###autoload
 (defun tray-builder-dwim ()
   "Show a menu with relevant local commands and keybindings."
@@ -1506,7 +1495,6 @@ Argument MODES is a list of mode symbols to map to prefixes."
                                       'describe-mode)))
                               t))]))))
 
-
 (defun tray-builder-eval-dynamic-eval (name body)
   "Evaluate BODY and define transient prefix NAME dynamically.
 
@@ -1523,7 +1511,6 @@ Argument BODY is a list of forms that define the transient command."
            ',name)
         t)
   name)
-
 
 ;;;###autoload (autoload 'tray-builder-menu "tray-builder" nil t)
 (transient-define-prefix tray-builder-menu ()
@@ -1550,7 +1537,6 @@ Argument BODY is a list of forms that define the transient command."
                                 (point))
                               nil
                               "Copied transient commands")))
-
 
 (defun tray-builder--format-menu-heading (title &optional note)
   "Format TITLE as a menu heading.
@@ -1697,9 +1683,6 @@ Argument SYM is a symbol whose value is to be toggled."
     (let ((val (symbol-value sym)))
       (funcall (or (get sym 'custom-set) 'set-default) sym (not val)))))
 
-
-
-
 (defun tray-builder--make-toggle-suffix (cmd &optional variable description
                                              align)
   "Create a toggle suffix for a command.
@@ -1716,11 +1699,6 @@ Optional argument ALIGN is the column to align the toggle's description."
                           description
                           align)))
 
-
-
-
-
-
 (defun tray-builder--get-filtered-toggle-suffixes ()
   "Filter command suffixes based on requirements."
   (seq-filter
@@ -1732,7 +1710,6 @@ Optional argument ALIGN is the column to align the toggle's description."
                              (plist-get v :if-require))))
           (commandp cmd)))
    tray-builder-toggle-suffixes))
-
 
 (defun tray-builder--generate-toggle-suffixes ()
   "Generate a list of key-command-description mappings."
