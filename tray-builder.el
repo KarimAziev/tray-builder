@@ -1453,7 +1453,7 @@ Argument MODES is a list of mode symbols to map to prefixes."
    (lambda (&rest _argsn)
      (mapcar
       (apply-partially #'transient-parse-suffix
-                       transient--prefix)
+                       (oref transient--prefix command))
       (list (list "g" "global modes"
                   (let ((groupped (tray-builder-map-modes-to-prefixes
                                    (tray-builder-global-minor-modes)))
@@ -1786,8 +1786,7 @@ integer."
       (let ((group (seq-take tray-builder--mapped-suffixes
                              (tray-builder--first-column-children-len
                               tray-builder--mapped-suffixes))))
-        (transient-parse-suffixes
-         transient--prefix
+        (oref transient--prefix command)
          (apply #'vector
                 group))))]
    [:description ""
@@ -1796,8 +1795,7 @@ integer."
       (let ((group (seq-drop tray-builder--mapped-suffixes
                              (tray-builder--first-column-children-len
                               tray-builder--mapped-suffixes))))
-        (transient-parse-suffixes
-         transient--prefix
+        (oref transient--prefix command)
          (apply #'vector
                 group))))]
    ["Other"
