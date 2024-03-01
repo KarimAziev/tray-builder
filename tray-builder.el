@@ -1449,7 +1449,8 @@ Argument MODES is a list of mode symbols to map to prefixes."
 ;;;###autoload (autoload 'tray-builder-eval-toggle-minor-mode-prefix "tray-builder" nil t)
 (transient-define-prefix tray-builder-eval-toggle-minor-mode-prefix ()
   "Toggle global or local minor modes dynamically."
-  [:setup-children
+  [:class transient-column
+   :setup-children
    (lambda (&rest _argsn)
      (mapcar
       (apply-partially #'transient-parse-suffix
@@ -1779,23 +1780,26 @@ integer."
   "Toggle menu options with dynamic entries from `tray-builder-toggle-suffixes'."
   :refresh-suffixes t
   :transient-suffix t
-  [[:description
-    "Toggle"
+  [[:description "Toggle"
+    :class transient-column
     :setup-children
     (lambda (_args)
       (let ((group (seq-take tray-builder--mapped-suffixes
                              (tray-builder--first-column-children-len
                               tray-builder--mapped-suffixes))))
-        (oref transient--prefix command)
+        (transient-parse-suffixes
+         (oref transient--prefix command)
          (apply #'vector
                 group))))]
    [:description ""
+    :class transient-column
     :setup-children
     (lambda (_args)
       (let ((group (seq-drop tray-builder--mapped-suffixes
                              (tray-builder--first-column-children-len
                               tray-builder--mapped-suffixes))))
-        (oref transient--prefix command)
+        (transient-parse-suffixes
+         (oref transient--prefix command)
          (apply #'vector
                 group))))]
    ["Other"
