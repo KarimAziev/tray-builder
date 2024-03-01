@@ -30,6 +30,8 @@
 
 ;;; Code:
 
+(require 'transient)
+
 (defcustom tray-builder-transient-doc-regexp-words '("forward"
                                                      "backward"
                                                      "up"
