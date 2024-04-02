@@ -1614,10 +1614,16 @@ Argument SYM is a symbol whose value is to be toggled."
                  (list s
                        (get s 'variable-documentation)
                        (symbol-value s))
+                 vals))
+               ((guard (string-match-p "-debug$" (symbol-name s)))
+                (push
+                 (list s
+                       (get s 'variable-documentation)
+                       (symbol-value s))
                  vals)))
            (when (and (symbolp s)
                       (boundp s)
-                      (string-match-p (symbol-name s) "-debug$"))
+                      (string-match-p "-debug$" (symbol-name s)))
              (let ((value (symbol-value s)))
                (when (or (eq value t)
                          (not value))
