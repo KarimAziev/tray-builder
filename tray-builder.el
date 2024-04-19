@@ -1478,22 +1478,29 @@ Argument MODES is a list of mode symbols to map to prefixes."
   (call-interactively (tray-builder-eval-dynamic-eval
                        "tray-builder-active-modes"
                        `([,@(tray-builder-group-vectors
-                             (tray-builder-commands-alist-to-transient
-                              (append
-                               (tray-builder-keymap-to-alist
-                                (current-local-map)
-                                (lambda (_key value)
-                                  (not
-                                   (eq value
-                                    'tray-builder-dwim))))
-                               (when-let
-                                   ((sym
-                                     (tray-builder-help-fns--most-relevant-active-keymap)))
+                             (mapcar (pcase-lambda (`(,k . ,rest))
+                                       (append
+                                        (list (replace-regexp-in-string "^C-x "
+                                               ""
+                                               k))
+                                        rest))
+                              (delete-dups
+                               (tray-builder-commands-alist-to-transient
+                                (append
                                  (tray-builder-keymap-to-alist
-                                  sym))
-                               (list (cons "?"
-                                      'describe-mode)))
-                              t))]))))
+                                  (current-local-map)
+                                  (lambda (_key value)
+                                    (not
+                                     (eq value
+                                      'tray-builder-dwim))))
+                                 (when-let
+                                     ((sym
+                                       (tray-builder-help-fns--most-relevant-active-keymap)))
+                                   (tray-builder-keymap-to-alist
+                                    sym))
+                                 (list (cons "?"
+                                        'describe-mode)))
+                                t))))]))))
 
 (defun tray-builder-eval-dynamic-eval (name body)
   "Evaluate BODY and define transient prefix NAME dynamically.
