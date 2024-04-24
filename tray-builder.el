@@ -566,28 +566,35 @@ returns a new value to be associated with the key.
 
 Optional argument USED-KEYS is a list of strings representing keys that are
 already in use and should not be generated again."
-  (let*
-      ((value-fn (or value-fn (lambda (key value)
-                                (if (proper-list-p value)
-                                    (append (list key) value)
-                                  (cons key value)))))
-       (total (length items))
-       (random-variants (append
-                         (mapcar #'char-to-string
-                                 (number-sequence (string-to-char
-                                                   "a")
-                                                  (string-to-char
-                                                   "z")))
-                         (mapcar #'char-to-string
-                                 (number-sequence (string-to-char
-                                                   "A")
-                                                  (string-to-char
-                                                   "Z")))))
-       (min-len
-        (let ((max-used-key-len (length (car (seq-sort-by #'length #'>
-                                                          used-keys)))))
-          (max 1 max-used-key-len (ceiling (log total (length
-                                                       random-variants)))))))
+  (let* ((value-fn (or value-fn (lambda (key value)
+                                  (if (proper-list-p value)
+                                      (append (list key) value)
+                                    (cons key value)))))
+         (total (length items))
+         (random-variants (append
+                           (mapcar #'char-to-string
+                                   (number-sequence (string-to-char
+                                                     "a")
+                                                    (string-to-char
+                                                     "z")))
+                           (mapcar #'char-to-string
+                                   (number-sequence (string-to-char
+                                                     "A")
+                                                    (string-to-char
+                                                     "Z")))))
+         (min-len
+          (let ((max-used-key-len
+                 (length
+                  (car
+                   (seq-sort-by #'length #'>
+                                (seq-remove
+                                 (apply-partially
+                                  #'string-match-p
+                                  "^\\([CM]-\\|\\(TAB\\|SPC\\|DEL\\|RET\\|<return>\\)$\\)")
+                                 used-keys))))))
+            (max 1 max-used-key-len (ceiling
+                                     (log total (length
+                                                 random-variants)))))))
     (let ((shortcuts used-keys)
           (used-words '())
           (all-keys (mapcar (lambda (def)
