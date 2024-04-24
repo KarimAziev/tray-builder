@@ -566,6 +566,11 @@ returns a new value to be associated with the key.
 
 Optional argument USED-KEYS is a list of strings representing keys that are
 already in use and should not be generated again."
+  (setq used-keys (seq-remove
+                   (apply-partially
+                    #'string-match-p
+                    "^\\([SCM]-\\|\\(TAB\\|SPC\\|DEL\\|RET\\|<return>\\)$\\)")
+                   used-keys))
   (let* ((value-fn (or value-fn (lambda (key value)
                                   (if (proper-list-p value)
                                       (append (list key) value)
@@ -585,16 +590,14 @@ already in use and should not be generated again."
          (min-len
           (let ((max-used-key-len
                  (length
-                  (car
-                   (seq-sort-by #'length #'>
-                                (seq-remove
-                                 (apply-partially
-                                  #'string-match-p
-                                  "^\\([CM]-\\|\\(TAB\\|SPC\\|DEL\\|RET\\|<return>\\)$\\)")
-                                 used-keys))))))
+                  (or (car
+                       (seq-sort-by #'length #'>
+                                    used-keys))
+                      ""))))
             (max 1 max-used-key-len (ceiling
-                                     (log total (length
-                                                 random-variants)))))))
+                                     (log (max 1 total)
+                                          (length
+                                           random-variants)))))))
     (let ((shortcuts used-keys)
           (used-words '())
           (all-keys (mapcar (lambda (def)
@@ -1398,6 +1401,7 @@ defaults to the current window width."
        (apply #'vector it))
      (seq-split arguments final))))
 
+
 (defun tray-builder-map-modes-to-prefixes (modes)
   "Map major MODES to keyboard shortcuts.
 
@@ -1478,36 +1482,187 @@ Argument MODES is a list of mode symbols to map to prefixes."
                      `([,@groupped]))
                     sym)))))])
 
-;;;###autoload
-(defun tray-builder-dwim ()
-  "Show a menu with relevant local commands and keybindings."
+(defvar tray-builder--dwim-menu-commands nil)
+
+(defun tray-builder-group--arguments (arguments)
+  "Group and format ARGUMENTS, optionally splitting them by SPLIT-LEN.
+
+Argument ARGUMENTS is a list of items to be processed.
+
+Optional argument SPLIT-LEN specifies the target length for splitting the list
+of items."
+  (let* ((items
+          (seq-sort-by #'cadr #'string>
+                       arguments))
+         (all-items
+          (seq-reduce (lambda (acc it)
+                        (let* ((descr (car (split-string (cadr
+                                                          it)
+                                                         "-" t)))
+                               (prev (car acc))
+                               (prev-str (and (listp prev)
+                                              (cadr prev)
+                                              (car (split-string
+                                                    (cadr
+                                                     prev)
+                                                    "-" t))))
+                               (enabled (and prev-str
+                                             (not (string-prefix-p
+                                                   prev-str
+                                                   descr)))))
+                          (if (not enabled)
+                              (progn
+                                (setq acc (push it acc)))
+                            (let ((prevs (seq-take-while #'listp
+                                                         acc)))
+                              (when (length> prevs 0)
+                                (mapc
+                                 (lambda (it)
+                                   (let* ((tail (cdr it))
+                                          (str
+                                           (replace-regexp-in-string
+                                            "^[-]+"
+                                            ""
+                                            (substring-no-properties
+                                             (car
+                                              tail)
+                                             (length
+                                              prev-str)))))
+                                     (setcdr it
+                                             (list (if (string-empty-p
+                                                        str)
+                                                       (car tail)
+                                                     str)
+                                                   (cadr tail)))))
+                                 prevs)
+                                (setq acc (push prev-str acc))))
+                            (setq acc (push "" acc))
+                            (setq acc (push it acc)))))
+                      items '()))
+         (groupped (seq-split all-items
+                              (max 10
+                                   (/ (length all-items)
+                                      4)))))
+    (nreverse (seq-reduce
+               (lambda (acc it)
+                 (let* ((prev (car acc))
+                        (prev-tail (car (last prev))))
+                   (when (stringp prev-tail)
+                     (push prev-tail it)
+                     (nbutlast prev 1))
+                   (setq acc (push it acc))))
+               groupped '()))))
+
+(defun tray-builder--extract-keys-from-layout (layout)
+  "Extract keys from a transient layout.
+
+Argument LAYOUT is a list structure representing the key layout from which keys
+are to be extracted."
+  (let ((res)
+        (stack layout))
+    (while stack
+      (let ((curr (pop stack))
+            (key))
+        (pcase curr
+          ((pred (vectorp))
+           (push (append curr nil) stack))
+          ((pred (not (listp)))
+           nil)
+          ((guard (setq key (plist-get curr :key)))
+           (push key res))
+          ((guard curr)
+           (setq stack (append stack curr))))))
+    res))
+
+;;;###autoload (autoload 'tray-builder-dwim "tray-builder" nil t)
+(transient-define-prefix tray-builder-dwim ()
+  "Display a menu of dwim commands grouped into columns."
+  [[:setup-children
+    (lambda (_args)
+      (transient-parse-suffixes
+       (oref transient--prefix command)
+       (nth 0 tray-builder--dwim-menu-commands)))
+    :class transient-column]
+   [:setup-children
+    (lambda (_args)
+      (transient-parse-suffixes
+       (oref transient--prefix command)
+       (nth 1 tray-builder--dwim-menu-commands)))
+    :class transient-column]
+   [:setup-children
+    (lambda (_args)
+      (transient-parse-suffixes
+       (oref transient--prefix command)
+       (nth 2 tray-builder--dwim-menu-commands)))
+    :class transient-column]
+   [:setup-children
+    (lambda (_args)
+      (transient-parse-suffixes
+       (oref transient--prefix command)
+       (nth 3 tray-builder--dwim-menu-commands)))
+    :class transient-column]
+   [:setup-children
+    (lambda (_args)
+      (transient-parse-suffixes
+       (oref transient--prefix command)
+       (nth 4 tray-builder--dwim-menu-commands)))
+    :class transient-column]]
   (interactive)
-  (call-interactively (tray-builder-eval-dynamic-eval
-                       "tray-builder-active-modes"
-                       `([,@(tray-builder-group-vectors
-                             (mapcar (pcase-lambda (`(,k . ,rest))
-                                       (append
-                                        (list (replace-regexp-in-string "^C-x "
-                                               ""
-                                               k))
-                                        rest))
-                              (delete-dups
-                               (tray-builder-commands-alist-to-transient
-                                (append
-                                 (tray-builder-keymap-to-alist
-                                  (current-local-map)
-                                  (lambda (_key value)
-                                    (not
-                                     (eq value
-                                      'tray-builder-dwim))))
-                                 (when-let
-                                     ((sym
-                                       (tray-builder-help-fns--most-relevant-active-keymap)))
-                                   (tray-builder-keymap-to-alist
-                                    sym))
-                                 (list (cons "?"
-                                        'describe-mode)))
-                                t))))]))))
+  (let* ((buzy-keys (mapcar #'string-trim (tray-builder--extract-keys-from-layout
+                                           (get 'transient-common-commands
+                                                'transient--layout))))
+         (cmds (seq-remove
+                (pcase-lambda (`(,_k . ,v))
+                  (eq v 'tray-builder-dwim))
+                (delete-dups
+                 (append
+                  (tray-builder-keymap-to-alist
+                   (current-local-map))
+                  (when-let
+                      ((sym
+                        (tray-builder-help-fns--most-relevant-active-keymap)))
+                    (tray-builder-keymap-to-alist
+                     sym))
+                  (list (cons "?"
+                              'describe-mode))))))
+         (conflicting-cmds (seq-filter
+                            (pcase-lambda (`(,k . ,_v))
+                              (or (member k buzy-keys)
+                                  (seq-find
+                                   (lambda
+                                     (it)
+                                     (or
+                                      (string-prefix-p
+                                       it
+                                       k)
+                                      (string-prefix-p
+                                       k
+                                       it)))
+                                   buzy-keys)))
+                            cmds))
+         (cmds (if conflicting-cmds
+                   (seq-difference cmds conflicting-cmds)
+                 cmds))
+         (remapped (tray-builder-generate-shortcuts
+                    (mapcar #'cdr conflicting-cmds)
+                    nil nil (append buzy-keys (mapcar #'car cmds))))
+         (cmds (mapcar
+                (pcase-lambda (`(,key . ,cmd))
+                  (let* ((label (symbol-name cmd))
+                         (words (split-string label "[^a-z]" t))
+                         (pl
+                          (when
+                              (seq-intersection words
+                                                tray-builder-transient-doc-regexp-words)
+                            (list :transient t))))
+                    (if pl
+                        (append (list key label cmd) pl)
+                      (list key label cmd))))
+                (append cmds
+                        remapped))))
+    (setq tray-builder--dwim-menu-commands (tray-builder-group--arguments cmds)))
+  (transient-setup #'tray-builder-dwim))
+
 
 (defun tray-builder-eval-dynamic-eval (name body)
   "Evaluate BODY and define transient prefix NAME dynamically.
@@ -1763,7 +1918,7 @@ Optional argument ALIGN is the column to align the toggle's description."
                          (plist-get (cdr (assq cmd generated)) :key)))
                 (descr (plist-get pl :description))
                 (tranprops (tray-builder--plist-pick
-                            (mapcar 'car
+                            (mapcar #'car
                                     tray-builder-transient-options)
                             pl)))
            (append (list key cmd
@@ -1827,7 +1982,7 @@ integer."
     ("!" "Toggle variable" tray-builder-toggle-custom-boolean-var :transient nil)]]
   (interactive)
   (setq tray-builder--mapped-suffixes (tray-builder--generate-toggle-suffixes))
-  (transient-setup 'tray-builder-toggle-menu))
+  (transient-setup #'tray-builder-toggle-menu))
 
 (provide 'tray-builder)
 ;;; tray-builder.el ends here
