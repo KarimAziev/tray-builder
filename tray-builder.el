@@ -126,102 +126,103 @@ or personal preference for the appearance of the tray builder's toggle display."
   :group 'tray-builder
   :type 'integer)
 
-(defcustom tray-builder-toggle-suffixes `((display-line-numbers-mode
-                                           :key "l")
-                                          (visual-line-mode :key "v")
-                                          (whitespace-mode :description
-                                           "Show Whitespaces")
-                                          (dimmer-extra-transient
-                                           :description
-                                           "Highlight selected buffers"
-                                           :if-require (dimmer-extra))
-                                          (repeat-mode)
-                                          (visual-fill-column-mode
-                                           :description
-                                           "Visual Fill Column")
-                                          (page-break-lines-mode
-                                           :description
-                                           "Hide ^L characters")
-                                          (rainbow-mode :description
-                                           "Highlight colors")
-                                          (hl-line-mode
-                                           :description
-                                           "Highlight the current line")
-                                          (hl-todo-mode :description
-                                           "Highlight TODO words")
-                                          (toggle-truncate-lines
-                                           :key "t"
-                                           :description
-                                           "Truncate long lines"
-                                           :variable-indicator truncate-lines)
-                                          (marginalia-mode :key "A")
-                                          (minibuffer-auto-mode :key "M")
-                                          (minibuffer-auto-preview-mode :key
-                                           "R")
-                                          (minibuffer-auto-crm-mode :key "m")
-                                          (icomplete-mode :key "I")
-                                          (fido-mode :key "F")
-                                          (fido-vertical-mode :key "V")
-                                          (ivy-mode :key "i")
-                                          (counsel-mode :if-require (counsel))
-                                          (auto-fill-mode :description
-                                           ,(tray-builder--make-toggled-description
-                                             'auto-fill-function
-                                             (concat "Auto Wrapping at column "
-                                              (propertize
-                                               (format
-                                                "%s"
-                                                fill-column)
-                                               'face
-                                               'font-lock-keyword-face))
-                                             (* tray-builder-align-toggle-num 2)))
-                                          (emmet-mode :key "E")
-                                          (toggle-debug-on-error
-                                           :key "d"
-                                           :variable-indicator debug-on-error
-                                           :description
-                                           "Debug on error")
-                                          (toggle-debug-on-quit
-                                           :key "X"
-                                           :variable-indicator debug-on-quit)
-                                          (transient-toggle-debug
-                                           :key "O"
-                                           :variable-indicator transient--debug)
-                                          (treesit-inspect-mode
-                                           :if
-                                           (lambda ()
-                                             (fboundp 'treesit-inspect-mode))
-                                           :description
-                                           (lambda () "Tree sit inspect")
-                                           :inapt-if-not (lambda ()
-                                                           (derived-mode-p
-                                                            'c-ts-mode
-                                                            'cmake-ts-mode
-                                                            'cpp-ts-mode
-                                                            'css-ts-mode
-                                                            'dockerfile-ts-mode
-                                                            'elixir-ts-mode
-                                                            'go-ts-mode
-                                                            'html-ts-mode
-                                                            'java-ts-mode
-                                                            'tsx-ts-mode
-                                                            'typescript-ts-mode
-                                                            'json-ts-mode
-                                                            'julia-ts-mode
-                                                            'kotlin-ts-mode
-                                                            'python-ts-mode
-                                                            'ruby-ts-mode
-                                                            'rust-ts-mode
-                                                            'toml-ts-mode
-                                                            'yaml-ts-mode
-                                                            'json-ts-mode
-                                                            'c++-ts-mode)))
-                                          (helm-mode :if-require (helm))
-                                          (org-toggle-inline-images
-                                           :if-derived
-                                           org-mode
-                                           :variable-indicator
-                                           org-inline-image-overlays))
+(defcustom tray-builder-toggle-suffixes
+  `((display-line-numbers-mode :key "l")
+    (visual-line-mode :key "v")
+    (whitespace-mode :description
+                     "Show Whitespaces")
+    (dimmer-extra-transient
+     :description
+     "Highlight selected buffers"
+     :if-require (dimmer-extra))
+    (repeat-mode)
+    (visual-fill-column-mode
+     :description
+     "Visual Fill Column")
+    (page-break-lines-mode
+     :description
+     "Hide ^L characters")
+    (rainbow-mode :description
+                  "Highlight colors")
+    (hl-line-mode
+     :description
+     "Highlight the current line")
+    (hl-todo-mode :description
+                  "Highlight TODO words")
+    (toggle-truncate-lines
+     :key "t"
+     :description
+     "Truncate long lines"
+     :variable-indicator truncate-lines)
+    (marginalia-mode :key "A")
+    (minibuffer-auto-mode :key "M")
+    (minibuffer-auto-preview-mode :key
+                                  "R")
+    (minibuffer-auto-crm-mode :key "m")
+    (icomplete-mode :key "I")
+    (fido-mode :key "F")
+    (fido-vertical-mode :key "V")
+    (ivy-mode :key "i")
+    (counsel-mode :if-require (counsel))
+    (auto-fill-mode
+     :description
+     ,(tray-builder--make-toggled-description
+       'auto-fill-function
+       (concat "Auto Wrapping at column "
+               (propertize
+                (format
+                 "%s"
+                 fill-column)
+                'face
+                'font-lock-keyword-face))
+       (* tray-builder-align-toggle-num 2)))
+    (emmet-mode :key "E")
+    (toggle-debug-on-error
+     :key "d"
+     :variable-indicator debug-on-error
+     :description
+     "Debug on error")
+    (toggle-debug-on-quit
+     :key "X"
+     :variable-indicator debug-on-quit)
+    (transient-toggle-debug
+     :key "O"
+     :variable-indicator transient--debug)
+    (treesit-inspect-mode
+     :if
+     (lambda ()
+       (fboundp 'treesit-inspect-mode))
+     :description
+     (lambda () "Tree sit inspect")
+     :inapt-if-not (lambda ()
+                     (derived-mode-p
+                      'c-ts-mode
+                      'cmake-ts-mode
+                      'cpp-ts-mode
+                      'css-ts-mode
+                      'dockerfile-ts-mode
+                      'elixir-ts-mode
+                      'go-ts-mode
+                      'html-ts-mode
+                      'java-ts-mode
+                      'tsx-ts-mode
+                      'typescript-ts-mode
+                      'json-ts-mode
+                      'julia-ts-mode
+                      'kotlin-ts-mode
+                      'python-ts-mode
+                      'ruby-ts-mode
+                      'rust-ts-mode
+                      'toml-ts-mode
+                      'yaml-ts-mode
+                      'json-ts-mode
+                      'c++-ts-mode)))
+    (helm-mode :if-require (helm))
+    (org-toggle-inline-images
+     :if-derived
+     org-mode
+     :variable-indicator
+     org-inline-image-overlays))
   "List of toggle commands with optional keys and descriptions.
 
 A list of toggle commands and their associated properties for use in the tray
@@ -285,7 +286,7 @@ its associated properties for customization."
                      :format "%v "
                      ,(car it))
                     ,(cadr it)))
-         tray-builder-transient-options)))))
+                tray-builder-transient-options)))))
 
 (defun tray-builder--plist-pick (keywords pl)
   "Extract specified keys and values from a property list.
@@ -335,8 +336,10 @@ Argument KEYMAP is a keymap to search for its variable name."
   "Find the most relevant active keymap at point."
   (tray-builder-help-fns-find-keymap-name (or
                                            (get-char-property (point) 'keymap)
-                                           (if (get-text-property (point) 'local-map)
-                                               (get-char-property (point) 'local-map)
+                                           (if (get-text-property (point)
+                                                                  'local-map)
+                                               (get-char-property (point)
+                                                                  'local-map)
                                              (current-local-map)))))
 
 (defun tray-builder-copy-as-string (result)
@@ -451,7 +454,8 @@ Argument WORD is a string to generate capitalized variants from."
     (dotimes (i (length parts))
       (let ((val (string-join (remove nil (list
                                            (when (> i 0)
-                                             (string-join (seq-take parts i) ""))
+                                             (string-join
+                                              (seq-take parts i) ""))
                                            (upcase (nth i parts))
                                            (string-join (seq-drop parts (1+ i))
                                                         "")))
@@ -472,15 +476,17 @@ strings."
          (parts-len (length parts))
          (finalize (lambda (short)
                      (while (> len (length short))
-                       (setq short (concat short (number-to-string (random 10)))))
+                       (setq short (concat short (number-to-string
+                                                  (random 10)))))
                      (tray-builder-safe-substring len short)))
          (vars
           (mapcar finalize (tray-builder-capitalize-variants
-                            (tray-builder-safe-substring len
-                                                         (replace-regexp-in-string
-                                                          "[^a-z]"
-                                                          ""
-                                                          word))))))
+                            (tray-builder-safe-substring
+                             len
+                             (replace-regexp-in-string
+                              "[^a-z]"
+                              ""
+                              word))))))
     (seq-sort-by
      (lambda (it)
        (cond ((string-match-p "[0-9]" it)
@@ -801,18 +807,20 @@ generate keys for COMMANDS automatically."
                   (doc (or (if (proper-list-p line)
                                (seq-find #'stringp (remove key line))
                              (and (not short-descr)
-                                  (when-let* ((doc-str (ignore-errors (documentation
-                                                                       symb)))
-                                              (parts (split-string
-                                                      (replace-regexp-in-string
-                                                       "[.][\s\t]*$"
-                                                       ""
-                                                       (car
-                                                        (split-string
-                                                         (substring-no-properties
-                                                          doc-str)
-                                                         "\n" t)))
-                                                      nil t)))
+                                  (when-let* ((doc-str
+                                               (ignore-errors (documentation
+                                                               symb)))
+                                              (parts
+                                               (split-string
+                                                (replace-regexp-in-string
+                                                 "[.][\s\t]*$"
+                                                 ""
+                                                 (car
+                                                  (split-string
+                                                   (substring-no-properties
+                                                    doc-str)
+                                                   "\n" t)))
+                                                nil t)))
                                     (let ((case-fold-search nil))
                                       (mapconcat
                                        (lambda (it)
@@ -889,11 +897,13 @@ Argument END is the position of the end of the region in the buffer."
                                         str)
                                       (if (symbolp fn)
                                           (tray-builder-read-description fn)
-                                        (read-string (concat (format
-                                                              "Name for (key %s) "
-                                                              key)))))
+                                        (read-string (concat
+                                                      (format
+                                                       "Name for (key %s) "
+                                                       key)))))
                                      (cond ((and (listp fn)
-                                                 (not (eq 'lambda (car-safe fn))))
+                                                 (not (eq 'lambda
+                                                          (car-safe fn))))
                                             `(lambda ()
                                                (interactive)
                                                ,fn))
@@ -1073,7 +1083,8 @@ Argument END is the ending position of the region."
              (apply #'vector (tray-builder-commands-alist-to-transient sexps)))
             ((guard (tray-builder--alistp (car-safe sexps)))
              (apply #'vector
-                    (tray-builder-commands-alist-to-transient (car-safe sexps))))
+                    (tray-builder-commands-alist-to-transient
+                     (car-safe sexps))))
             (_ (tray-builder--from-region-lines beg end)))))
     (tray-builder-copy-as-string
      result)))
@@ -1146,49 +1157,54 @@ and returns non-nil if the key-command pair should be included in the output.
 
 Remaining arguments ARGS are additional arguments passed to the internal
 function `tray-builder--substitute-map'."
-  (when-let* ((lines (ignore-errors (split-string (apply
-                                                   #'tray-builder--substitute-map
-                                                   (append
-                                                    (list
-                                                     keymap)
-                                                    args))
-                                                  "\n"
-                                                  t)))
-              (filtered (delq nil (mapcar
-                                   (lambda
-                                     (it)
-                                     (when-let*
-                                         ((chars         (and it
-                                                              (stringp it)
-                                                              (split-string it
-                                                                            ""
-                                                                            t)))
-                                          (key-chars
-                                           (seq-take-while
-                                            (lambda (c)
-                                              (get-text-property
-                                               0
-                                               'face
-                                               c))
-                                            chars))
-                                          (key (string-join key-chars ""))
-                                          (cmd (intern-soft
-                                                (string-trim (substring-no-properties
-                                                              it (length
-                                                                  key))))))
-                                       (when (and (key-valid-p key)
-                                                  (not (string-match-p
-                                                        tray-builder-assist-exclude-regexps
-                                                        key))
-                                                  (not
-                                                   (memq cmd
-                                                         tray-builder-exclude-cmds))
-                                                  (or (not filter)
-                                                      (funcall filter key cmd)))
-                                         (cons													(substring-no-properties
-                                                                                                                                                 key)
-                                                                                                                                                cmd))))
-                                   lines))))
+  (let* ((lines (ignore-errors (split-string (apply
+                                              #'tray-builder--substitute-map
+                                              (append
+                                               (list
+                                                keymap)
+                                               args))
+                                             "\n"
+                                             t)))
+         (filtered (delq nil
+                         (mapcar
+                          (lambda
+                            (it)
+                            (when-let* ((chars
+                                         (and it
+                                              (stringp it)
+                                              (split-string
+                                               it
+                                               ""
+                                               t)))
+                                        (key-chars
+                                         (seq-take-while
+                                          (lambda (c)
+                                            (get-text-property
+                                             0
+                                             'face
+                                             c))
+                                          chars))
+                                        (key (string-join key-chars ""))
+                                        (cmd (intern-soft
+                                              (string-trim
+                                               (substring-no-properties
+                                                it (length
+                                                    key))))))
+                              (when (and
+                                     (key-valid-p key)
+                                     (not (string-match-p
+                                           tray-builder-assist-exclude-regexps
+                                           key))
+                                     (not
+                                      (memq cmd
+                                            tray-builder-exclude-cmds))
+                                     (or (not filter)
+                                         (funcall filter key cmd)))
+                                (cons
+                                 (substring-no-properties
+                                  key)
+                                 cmd))))
+                          lines))))
     (seq-sort-by
      (lambda (a)
        (length (car a)))
@@ -1356,51 +1372,6 @@ cons cell or list with a string as its first element."
   (when (stringp (car-safe item))
     (car item)))
 
-(defun tray-builder-group-vectors (arguments &optional height win-width)
-  "Group ARGUMENTS into vectors based on HEIGHT and WIN-WIDTH.
-
-Argument ARGUMENTS is a list of items to be grouped into vectors.
-
-Optional argument HEIGHT is the maximum number of lines for the display; it
-defaults to a fraction of `max-mini-window-height'.
-
-Optional argument WIN-WIDTH is the width of the window in characters; it
-defaults to the current window width."
-  (let* ((descriptions
-          (sort
-           (mapcar #'(lambda
-                       (&rest args)
-                       (length
-                        (apply
-                         #'(lambda
-                             (&rest args)
-                             (apply #'concat
-                              (list
-                               (apply
-                                #'tray-builder-take-key
-                                args)
-                               (apply
-                                #'tray-builder-take-description
-                                args))))
-                         args)))
-                   arguments)
-           #'>))
-         (longest (+ 10 (car descriptions)))
-         (win-width (or win-width (window-width)))
-         (max-cols (/ win-width longest))
-         (count (length arguments))
-         (height (or height
-                     (floor (* max-mini-window-height 100))))
-         (cols (if (>= height count)
-                   1
-                 (/ win-width longest)))
-         (final-cols (min max-cols cols))
-         (final (/ count final-cols)))
-    (mapcar
-     (lambda (it)
-       (apply #'vector it))
-     (seq-split arguments final))))
-
 
 (defun tray-builder-map-modes-to-prefixes (modes)
   "Map major MODES to keyboard shortcuts.
@@ -1437,16 +1408,16 @@ Argument MODES is a list of mode symbols to map to prefixes."
                                   "^Toggle[\s]\\|\\.$\\|-\\|Mode"
                                   (lambda (it)
                                     (pcase it
-                                     ("-" " ")
-                                     (_ "")))
+                                      ("-" " ")
+                                      (_ "")))
                                   (capitalize (symbol-name mode))))
                           (doc (truncate-string-to-width
                                 label
                                 ,maxwidth nil nil nil ".")))
-                    (if (and (boundp mode)
-                         (symbol-value mode))
-                        (propertize doc 'face 'success)
-                      doc)))
+                     (if (and (boundp mode)
+                              (symbol-value mode))
+                         (propertize doc 'face 'success)
+                       doc)))
                 :transient t)))))
          (groupped (mapcar
                     (lambda (it)
@@ -1473,8 +1444,9 @@ Argument MODES is a list of mode symbols to map to prefixes."
                      `([,@groupped]))
                     sym))
             (list "l" "local modes"
-                  (let ((groupped (tray-builder-map-modes-to-prefixes
-                                   (tray-builder-non-global-minor-modes)))
+                  (let ((groupped
+                         (tray-builder-map-modes-to-prefixes
+                          (tray-builder-non-global-minor-modes)))
                         (sym (make-symbol
                               "tray-builder-toggle-local-modes")))
                     (tray-builder-eval-dynamic-eval
@@ -1608,23 +1580,24 @@ are to be extracted."
        (nth 4 tray-builder--dwim-menu-commands)))
     :class transient-column]]
   (interactive)
-  (let* ((buzy-keys (mapcar #'string-trim (tray-builder--extract-keys-from-layout
-                                           (get 'transient-common-commands
-                                                'transient--layout))))
-         (cmds (seq-remove
-                (pcase-lambda (`(,_k . ,v))
-                  (eq v 'tray-builder-dwim))
-                (delete-dups
-                 (append
-                  (tray-builder-keymap-to-alist
-                   (current-local-map))
-                  (when-let
-                      ((sym
-                        (tray-builder-help-fns--most-relevant-active-keymap)))
-                    (tray-builder-keymap-to-alist
-                     sym))
-                  (list (cons "?"
-                              'describe-mode))))))
+  (let* ((buzy-keys
+          (mapcar #'string-trim (tray-builder--extract-keys-from-layout
+                                 (get 'transient-common-commands
+                                      'transient--layout))))
+         (cmds
+          (seq-remove
+           (pcase-lambda (`(,_k . ,v))
+             (eq v 'tray-builder-dwim))
+           (delete-dups
+            (append
+             (tray-builder-keymap-to-alist
+              (current-local-map))
+             (when-let ((sym
+                         (tray-builder-help-fns--most-relevant-active-keymap)))
+               (tray-builder-keymap-to-alist
+                sym))
+             (list (cons "?"
+                         'describe-mode))))))
          (conflicting-cmds (seq-filter
                             (pcase-lambda (`(,k . ,_v))
                               (or (member k buzy-keys)
@@ -1652,15 +1625,17 @@ are to be extracted."
                          (words (split-string label "[^a-z]" t))
                          (pl
                           (when
-                              (seq-intersection words
-                                                tray-builder-transient-doc-regexp-words)
+                              (seq-intersection
+                               words
+                               tray-builder-transient-doc-regexp-words)
                             (list :transient t))))
                     (if pl
                         (append (list key label cmd) pl)
                       (list key label cmd))))
                 (append cmds
                         remapped))))
-    (setq tray-builder--dwim-menu-commands (tray-builder-group--arguments cmds)))
+    (setq tray-builder--dwim-menu-commands (tray-builder-group--arguments
+                                            cmds)))
   (transient-setup #'tray-builder-dwim))
 
 
@@ -1713,10 +1688,10 @@ When NOTE is non-nil, append it the next line."
   (let ((no-wb (= (frame-bottom-divider-width) 0)))
     (format "%s%s%s"
             (propertize title 'face `(:inherit font-lock-constant-face
-                                      :overline ,no-wb)
+                                               :overline ,no-wb)
                         'display '((height 1.1)))
             (propertize " " 'face `(:inherit font-lock-constant-face
-                                    :overline ,no-wb)
+                                             :overline ,no-wb)
                         'display '(space :align-to right))
             (propertize (if note (concat "\n" note) "") 'face
                         'font-lock-doc-face))))
@@ -1740,9 +1715,11 @@ Argument SYM is a symbol whose value is to be toggled."
                                 (let ((sexp
                                        (sexp-at-point)))
                                   (pcase sexp
-                                    (`(defcustom ,(and (pred (symbolp))
-                                                   symb-name
-                                                   (guard (not (memq symb-name '(t nil)))))
+                                    (`(defcustom
+                                        ,(and (pred (symbolp))
+                                              symb-name
+                                              (guard
+                                               (not (memq symb-name '(t nil)))))
                                         ,(or 't 'nil)
                                         ,(pred (stringp))
                                         . ,_pl)
@@ -1804,15 +1781,16 @@ Argument SYM is a symbol whose value is to be toggled."
                              (cond ((and initial-input
                                          (string= initial-input str))
                                     -1)
-                                   ((member str
-                                            tray-builder--boolean-variable-history)
+                                   ((member
+                                     str
+                                     tray-builder--boolean-variable-history)
                                     0)
                                    (t (string-to-char str))))
                            #'<
                            (mapcar
                             (pcase-lambda
                               (`(,k .
-                                 ,_))
+                                    ,_))
                               (substring-no-properties
                                (symbol-name
                                 k)))
@@ -1826,7 +1804,7 @@ Argument SYM is a symbol whose value is to be toggled."
                              (cdr (assq (intern str) alist))))
                          (concat
                           (propertize " " 'display `(space :align-to
-                                                     ,(1+ len)))
+                                                           ,(1+ len)))
                           (if value "[X]" "[ ]")
                           " "
                           (truncate-string-to-width
@@ -1847,7 +1825,7 @@ Argument SYM is a symbol whose value is to be toggled."
                             (if (eq action 'metadata)
                                 `(metadata
                                   (annotation-function .
-                                   ,annotf))
+                                                       ,annotf))
                               (complete-with-action action
                                                     strs str
                                                     pred)))
@@ -1900,7 +1878,8 @@ Optional argument ALIGN is the column to align the toggle's description."
           (push key used-keys)
         (push (cons cmd pl) cmds)))
     (setq generated (tray-builder-generate-shortcuts cmds (lambda (it)
-                                                            (symbol-name (car it)))
+                                                            (symbol-name
+                                                             (car it)))
                                                      (lambda (key cell)
                                                        (pcase-let*
                                                            ((`(,cmd . ,pl)
@@ -1956,9 +1935,10 @@ integer."
     :class transient-column
     :setup-children
     (lambda (_args)
-      (let ((group (seq-take tray-builder--mapped-suffixes
-                             (tray-builder--first-column-children-len
-                              tray-builder--mapped-suffixes))))
+      (let ((group (seq-take
+                    tray-builder--mapped-suffixes
+                    (tray-builder--first-column-children-len
+                     tray-builder--mapped-suffixes))))
         (transient-parse-suffixes
          (oref transient--prefix command)
          (apply #'vector
@@ -1979,7 +1959,8 @@ integer."
      :description
      "Show all modes"
      :transient nil)
-    ("!" "Toggle variable" tray-builder-toggle-custom-boolean-var :transient nil)]]
+    ("!" "Toggle variable" tray-builder-toggle-custom-boolean-var
+     :transient nil)]]
   (interactive)
   (setq tray-builder--mapped-suffixes (tray-builder--generate-toggle-suffixes))
   (transient-setup #'tray-builder-toggle-menu))
