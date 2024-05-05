@@ -1592,10 +1592,6 @@ are to be extracted."
             (append
              (tray-builder-keymap-to-alist
               (current-local-map))
-             (when-let ((sym
-                         (tray-builder-help-fns--most-relevant-active-keymap)))
-               (tray-builder-keymap-to-alist
-                sym))
              (list (cons "?"
                          'describe-mode))))))
          (conflicting-cmds (seq-filter
@@ -1624,10 +1620,9 @@ are to be extracted."
                   (let* ((label (symbol-name cmd))
                          (words (split-string label "[^a-z]" t))
                          (pl
-                          (when
-                              (seq-intersection
-                               words
-                               tray-builder-transient-doc-regexp-words)
+                          (when (seq-intersection
+                                 words
+                                 tray-builder-transient-doc-regexp-words)
                             (list :transient t))))
                     (if pl
                         (append (list key label cmd) pl)
