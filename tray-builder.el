@@ -1,4 +1,4 @@
-;;; tray-builder.el --- Configure hydra builder -*- lexical-binding: t -*-
+;;; tray-builder.el --- Context-sensitive transient menus and helpers -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2022 Karim Aziiev <karim.aziiev@gmail.com>
 
@@ -26,7 +26,21 @@
 
 ;;; Commentary:
 
-;; Helpers for generating transient prefixes
+;; This package provides utilities for generating transient prefixes, which are
+;; useful for creating context-sensitive action trays in Emacs.
+
+;; It includes functions for handling keymaps, generating shortcuts, and toggling modes and
+;; variables.
+
+;; Transient commands:
+
+;; `tray-builder-dwim' - A context-sensitive transient menu.
+
+;; `tray-builder-toggle-menu' - Menu with entries from a custom variable `tray-builder-toggle-suffixes'.
+
+;; `tray-builder-menu' - Menu with helpers for generating transient prefixes.
+
+;; `tray-builder-eval-toggle-minor-mode-prefix' - Toggle global or local minor modes dynamically.
 
 ;;; Code:
 
@@ -1548,7 +1562,7 @@ are to be extracted."
 
 ;;;###autoload (autoload 'tray-builder-dwim "tray-builder" nil t)
 (transient-define-prefix tray-builder-dwim ()
-  "Display a menu of dwim commands grouped into columns."
+  "A transient menu with dynamic commands from current local map."
   [[:setup-children
     (lambda (_args)
       (transient-parse-suffixes
@@ -1653,7 +1667,7 @@ Argument BODY is a list of forms that define the transient command."
 
 ;;;###autoload (autoload 'tray-builder-menu "tray-builder" nil t)
 (transient-define-prefix tray-builder-menu ()
-  "Display menu to generate transient commands."
+  "Menu with helpers for generating transient prefixes."
   ["Generate prefix commands from "
    ("k" "Keymap" tray-builder-kill-commands-from-keymap)
    ("r" "Region lines" tray-builder-kill-from-region-lines
@@ -1923,7 +1937,7 @@ integer."
 
 ;;;###autoload (autoload 'tray-builder-toggle-menu "tray-builder" nil t)
 (transient-define-prefix tray-builder-toggle-menu ()
-  "Toggle menu options with dynamic entries from `tray-builder-toggle-suffixes'."
+  "Menu with entries from a custom variable `tray-builder-toggle-suffixes'."
   :refresh-suffixes t
   :transient-suffix t
   [[:description "Toggle"
