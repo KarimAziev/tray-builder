@@ -572,6 +572,8 @@ strings."
                 (not global))
               (tray-builder-minor-modes)))
 
+
+
 (defun tray-builder-generate-shortcuts (items &optional key-fn value-fn
                                               used-keys)
   "Generate shortcuts for ITEMS using optional KEY-FN and VALUE-FN.
@@ -646,10 +648,12 @@ already in use and should not be generated again."
               (setq short
                     (seq-find
                      (lambda (it)
-                       (not
-                        (seq-find (apply-partially
-                                   #'string-prefix-p it)
-                                  shortcuts)))
+                       (and (not (seq-find (apply-partially
+                                            #'string-prefix-p it)
+                                           shortcuts))
+                            (not (seq-some (lambda (shortcut)
+                                             (string-prefix-p shortcut it))
+                                           shortcuts))))
                      (append
                       (tray-builder-get-all-key-strategies word
                                                            min-len)
