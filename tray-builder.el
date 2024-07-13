@@ -140,103 +140,103 @@ or personal preference for the appearance of the tray builder's toggle display."
   :group 'tray-builder
   :type 'integer)
 
-(defcustom tray-builder-toggle-suffixes
-  `((display-line-numbers-mode :key "l")
-    (visual-line-mode :key "v")
-    (whitespace-mode :description
-                     "Show Whitespaces")
-    (dimmer-extra-transient
-     :description
-     "Highlight selected buffers"
-     :if-require (dimmer-extra))
-    (repeat-mode)
-    (visual-fill-column-mode
-     :description
-     "Visual Fill Column")
-    (page-break-lines-mode
-     :description
-     "Hide ^L characters")
-    (rainbow-mode :description
-                  "Highlight colors")
-    (hl-line-mode
-     :description
-     "Highlight the current line")
-    (hl-todo-mode :description
-                  "Highlight TODO words")
-    (toggle-truncate-lines
-     :key "t"
-     :description
-     "Truncate long lines"
-     :variable-indicator truncate-lines)
-    (marginalia-mode :key "A")
-    (minibuffer-auto-mode :key "M")
-    (minibuffer-auto-preview-mode :key
-                                  "R")
-    (minibuffer-auto-crm-mode :key "m")
-    (icomplete-mode :key "I")
-    (fido-mode :key "F")
-    (fido-vertical-mode :key "V")
-    (ivy-mode :key "i")
-    (counsel-mode :if-require (counsel))
-    (auto-fill-mode
-     :description
-     ,(tray-builder--make-toggled-description
-       'auto-fill-function
-       (concat "Auto Wrapping at column "
-               (propertize
-                (format
-                 "%s"
-                 fill-column)
-                'face
-                'font-lock-keyword-face))
-       (* tray-builder-align-toggle-num 2)))
-    (emmet-mode :key "E")
-    (toggle-debug-on-error
-     :key "d"
-     :variable-indicator debug-on-error
-     :description
-     "Debug on error")
-    (toggle-debug-on-quit
-     :key "X"
-     :variable-indicator debug-on-quit)
-    (transient-toggle-debug
-     :key "O"
-     :variable-indicator transient--debug)
-    (treesit-inspect-mode
-     :if
-     (lambda ()
-       (fboundp 'treesit-inspect-mode))
-     :description
-     (lambda () "Tree sit inspect")
-     :inapt-if-not (lambda ()
-                     (derived-mode-p
-                      'c-ts-mode
-                      'cmake-ts-mode
-                      'cpp-ts-mode
-                      'css-ts-mode
-                      'dockerfile-ts-mode
-                      'elixir-ts-mode
-                      'go-ts-mode
-                      'html-ts-mode
-                      'java-ts-mode
-                      'tsx-ts-mode
-                      'typescript-ts-mode
-                      'json-ts-mode
-                      'julia-ts-mode
-                      'kotlin-ts-mode
-                      'python-ts-mode
-                      'ruby-ts-mode
-                      'rust-ts-mode
-                      'toml-ts-mode
-                      'yaml-ts-mode
-                      'json-ts-mode
-                      'c++-ts-mode)))
-    (helm-mode :if-require (helm))
-    (org-toggle-inline-images
-     :if-derived
-     org-mode
-     :variable-indicator
-     org-inline-image-overlays))
+(defcustom tray-builder-toggle-suffixes `((display-line-numbers-mode :key "l")
+                                          (visual-line-mode :key "v")
+                                          (whitespace-mode :description
+                                           "Show Whitespaces")
+                                          (dimmer-extra-transient
+                                           :description
+                                           "Highlight selected buffers"
+                                           :if-feature (dimmer-extra))
+                                          (repeat-mode)
+                                          (visual-fill-column-mode
+                                           :description
+                                           "Visual Fill Column")
+                                          (page-break-lines-mode
+                                           :description
+                                           "Hide ^L characters")
+                                          (rainbow-mode :description
+                                           "Highlight colors")
+                                          (hl-line-mode
+                                           :description
+                                           "Highlight the current line")
+                                          (hl-todo-mode :description
+                                           "Highlight TODO words")
+                                          (toggle-truncate-lines
+                                           :key "t"
+                                           :description
+                                           "Truncate long lines"
+                                           :variable-indicator truncate-lines)
+                                          (marginalia-mode :key "A")
+                                          (minibuffer-auto-mode :key "M")
+                                          (minibuffer-auto-preview-mode :key
+                                           "R")
+                                          (minibuffer-auto-crm-mode :key "m")
+                                          (icomplete-mode :key "I")
+                                          (fido-mode :key "F")
+                                          (fido-vertical-mode :key "V")
+                                          (ivy-mode :key "i")
+                                          (counsel-mode :if-feature (counsel))
+                                          (vertico-mode :if-feature (vertico))
+                                          (auto-fill-mode
+                                           :description
+                                           ,(tray-builder--make-toggled-description
+                                             'auto-fill-function
+                                             (concat "Auto Wrapping at column "
+                                              (propertize
+                                               (format
+                                                "%s"
+                                                fill-column)
+                                               'face
+                                               'font-lock-keyword-face))
+                                             (* tray-builder-align-toggle-num 2)))
+                                          (emmet-mode :key "E")
+                                          (toggle-debug-on-error
+                                           :key "d"
+                                           :variable-indicator debug-on-error
+                                           :description
+                                           "Debug on error")
+                                          (toggle-debug-on-quit
+                                           :key "X"
+                                           :variable-indicator debug-on-quit)
+                                          (transient-toggle-debug
+                                           :key "O"
+                                           :variable-indicator transient--debug)
+                                          (treesit-inspect-mode
+                                           :if
+                                           (lambda ()
+                                             (fboundp 'treesit-inspect-mode))
+                                           :description
+                                           (lambda () "Tree sit inspect")
+                                           :inapt-if-not (lambda ()
+                                                           (derived-mode-p
+                                                            'c-ts-mode
+                                                            'cmake-ts-mode
+                                                            'cpp-ts-mode
+                                                            'css-ts-mode
+                                                            'dockerfile-ts-mode
+                                                            'elixir-ts-mode
+                                                            'go-ts-mode
+                                                            'html-ts-mode
+                                                            'java-ts-mode
+                                                            'tsx-ts-mode
+                                                            'typescript-ts-mode
+                                                            'json-ts-mode
+                                                            'julia-ts-mode
+                                                            'kotlin-ts-mode
+                                                            'python-ts-mode
+                                                            'ruby-ts-mode
+                                                            'rust-ts-mode
+                                                            'toml-ts-mode
+                                                            'yaml-ts-mode
+                                                            'json-ts-mode
+                                                            'c++-ts-mode)))
+                                          (helm-mode :if-feature (helm))
+                                          (org-toggle-inline-images
+                                           :if-derived
+                                           org-mode
+                                           :variable-indicator
+                                           org-inline-image-overlays))
   "List of toggle commands with optional keys and descriptions.
 
 A list of toggle commands and their associated properties for use in the tray
@@ -251,7 +251,9 @@ command.
   description for the toggle command.
 - :variable-indicator - A symbol representing a variable that indicates the
   toggle state.
-- :if-require - A list of symbols representing required features for the toggle
+- :if-require - A list of symbols representing features to require the toggle
+  command to be available.
+- :if-features - A list of symbols representing required features for the toggle
   command to be available.
 - :if-derived - A symbol representing a major mode that the current buffer must
   be derived from for the toggle to be applicable.
@@ -293,6 +295,10 @@ its associated properties for customization."
        (repeat symbol))
       ((const
         :format "%v "
+        :if-feature)
+       (repeat symbol))
+      ((const
+        :format "%v "
         :key)
        (string))
       ,@(mapcar (lambda (it)
@@ -300,7 +306,7 @@ its associated properties for customization."
                      :format "%v "
                      ,(car it))
                     ,(cadr it)))
-                tray-builder-transient-options)))))
+         tray-builder-transient-options)))))
 
 (defun tray-builder--plist-pick (keywords pl)
   "Extract specified keys and values from a property list.
@@ -1869,12 +1875,24 @@ Optional argument ALIGN is the column to align the toggle's description."
   "Filter command suffixes based on requirements."
   (seq-filter
    (pcase-lambda (`(,cmd . ,v))
-     (and (or (not (plist-get v :if-require))
-              (not (seq-find (lambda (it)
-                               (not
-                                (require it nil t)))
-                             (plist-get v :if-require))))
-          (commandp cmd)))
+     (let ((if-features (plist-get v :if-feature))
+           (if-requires (plist-get v :if-require)))
+       (and
+        (or (not if-features)
+            (if (listp if-features)
+                (not (seq-find (lambda (it)
+                                 (not
+                                  (featurep it)))
+                               if-features))
+              (featurep if-features)))
+        (or (not if-requires)
+            (if (listp if-requires)
+                (not (seq-find (lambda (it)
+                                 (not
+                                  (require it nil t)))
+                               if-requires))
+              (require if-requires nil t)))
+        (commandp cmd))))
    tray-builder-toggle-suffixes))
 
 (defun tray-builder--generate-toggle-suffixes ()
