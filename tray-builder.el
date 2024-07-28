@@ -1171,6 +1171,7 @@ to the current buffer."
                buff)
       (buffer-string))))
 
+
 (defun tray-builder-keymap-to-alist (keymap &optional filter &rest args)
   "Convert KEYMAP to alist, optionally filtering with FILTER and ARGS.
 
@@ -1181,54 +1182,68 @@ and returns non-nil if the key-command pair should be included in the output.
 
 Remaining arguments ARGS are additional arguments passed to the internal
 function `tray-builder--substitute-map'."
-  (let* ((lines (ignore-errors (split-string (apply
-                                              #'tray-builder--substitute-map
-                                              (append
-                                               (list
-                                                keymap)
-                                               args))
-                                             "\n"
-                                             t)))
-         (filtered (delq nil
-                         (mapcar
-                          (lambda
-                            (it)
-                            (when-let* ((chars
-                                         (and it
-                                              (stringp it)
-                                              (split-string
-                                               it
-                                               ""
-                                               t)))
-                                        (key-chars
-                                         (seq-take-while
-                                          (lambda (c)
-                                            (get-text-property
-                                             0
-                                             'face
-                                             c))
-                                          chars))
-                                        (key (string-join key-chars ""))
-                                        (cmd (intern-soft
-                                              (string-trim
-                                               (substring-no-properties
-                                                it (length
-                                                    key))))))
-                              (when (and
-                                     (key-valid-p key)
-                                     (not (string-match-p
-                                           tray-builder-assist-exclude-regexps
-                                           key))
-                                     (not
-                                      (memq cmd
-                                            tray-builder-exclude-cmds))
-                                     (or (not filter)
-                                         (funcall filter key cmd)))
-                                (cons
-                                 (substring-no-properties
-                                  key)
-                                 cmd))))
-                          lines))))
+  (let* ((value
+          (cond ((keymapp keymap)
+                 keymap)
+                ((stringp keymap)
+                 (ignore-errors (symbol-value (intern-soft keymap))))
+                ((symbolp keymap)
+                 (symbol-value keymap))))
+         (lines (delq nil
+                      (mapcar
+                       (lambda
+                         (it)
+                         (when-let* ((chars
+                                      (and it
+                                           (stringp it)
+                                           (split-string
+                                            it
+                                            ""
+                                            t)))
+                                     (key-chars
+                                      (seq-take-while
+                                       (lambda (c)
+                                         (get-text-property
+                                          0
+                                          'face
+                                          c))
+                                       chars))
+                                     (key (string-join key-chars ""))
+                                     (cmd (intern-soft
+                                           (string-trim
+                                            (substring-no-properties
+                                             it (length
+                                                 key))))))
+                           (when (and
+                                  (key-valid-p key)
+                                  (not (string-match-p
+                                        tray-builder-assist-exclude-regexps
+                                        key))
+                                  (not
+                                   (memq cmd
+                                         tray-builder-exclude-cmds))
+                                  (or (not filter)
+                                      (funcall filter key cmd)))
+                             (cons
+                              (substring-no-properties
+                               key)
+                              cmd))))
+                       (ignore-errors (split-string (apply
+                                                     #'tray-builder--substitute-map
+                                                     value
+                                                     args)
+                                                    "\n"
+                                                    t)))))
+         (filtered (seq-filter
+                    (pcase-lambda (`(,key . ,cmd))
+                      (let ((found (and (commandp cmd)
+                                        (where-is-internal
+                                         cmd
+                                         value))))
+                        (and found
+                             (member key
+                                     (mapcar #'key-description found)))))
+                    lines)))
     (seq-sort-by
      (lambda (a)
        (length (car a)))
@@ -1397,6 +1412,8 @@ cons cell or list with a string as its first element."
     (car item)))
 
 
+
+
 (defun tray-builder-map-modes-to-prefixes (modes)
   "Map major MODES to keyboard shortcuts.
 
@@ -1449,6 +1466,8 @@ Argument MODES is a list of mode symbols to map to prefixes."
                     (seq-split all-modes (/ (length all-modes) 5)))))
     groupped))
 
+
+
 ;;;###autoload (autoload 'tray-builder-eval-toggle-minor-mode-prefix "tray-builder" nil t)
 (transient-define-prefix tray-builder-eval-toggle-minor-mode-prefix ()
   "Toggle global or local minor modes dynamically."
@@ -1478,7 +1497,64 @@ Argument MODES is a list of mode symbols to map to prefixes."
                      `([,@groupped]))
                     sym)))))])
 
+(defun tray-builder--get-active-non-global-modes ()
+  "Tray-Builder."
+  (mapcar #'car (seq-filter (pcase-lambda (`(,_fn ,_var
+                                             ,global
+                                             ,enabled .
+                                             _rest))
+                              (and (not global)
+                                   enabled))
+                            (tray-builder-minor-modes))))
+
+(defun tray-builder--get-filtered-dwim-map ()
+  "Return a filtered keymap alist by comparing local and common modes."
+  (let* ((buff (current-buffer))
+         (curr-map (current-local-map))
+         (local-modes (tray-builder--get-active-non-global-modes))
+         (fund-modes (with-temp-buffer
+                       (tray-builder--get-active-non-global-modes)))
+         (prog-modes
+          (with-temp-buffer (prog-mode)
+                            (tray-builder--get-active-non-global-modes)))
+         (common-modes (delete-dups
+                        (append prog-modes fund-modes)))
+         (filter (lambda (key cmd)
+                   (with-current-buffer buff
+                     (let ((found (where-is-internal cmd)))
+                       (and found
+                            (member key
+                                    (mapcar #'key-description found)))))))
+         (res))
+    (dolist (m (seq-difference local-modes common-modes))
+      (when-let ((alist (tray-builder-keymap-to-alist
+                         (cdr (assq m minor-mode-map-alist))
+                         filter)))
+        (setq res (append res alist))))
+    (append (tray-builder-keymap-to-alist curr-map
+                                          (lambda (key cmd)
+                                            (with-current-buffer buff
+                                              (let ((found (where-is-internal
+                                                            cmd)))
+                                                (and found
+                                                     (member key
+                                                             (mapcar
+                                                              #'key-description
+                                                              found)))))))
+            res)))
+
 (defvar tray-builder--dwim-menu-commands nil)
+
+(defun tray-builder--get-description (item)
+  "Return the description of transient ITEM.
+
+Argument ITEM is a list containing elements to be destructured."
+  (pcase-let ((`(,_key ,descr-or-keyword ,descr-or-cmd . ,_rest) item))
+    (if (and (eq descr-or-keyword :description)
+             (functionp descr-or-cmd))
+        (funcall descr-or-cmd)
+      descr-or-keyword)))
+
 
 (defun tray-builder-group--arguments (arguments)
   "Group and format ARGUMENTS, optionally splitting them by SPLIT-LEN.
@@ -1488,18 +1564,20 @@ Argument ARGUMENTS is a list of items to be processed.
 Optional argument SPLIT-LEN specifies the target length for splitting the list
 of items."
   (let* ((items
-          (seq-sort-by #'cadr #'string>
+          (seq-sort-by #'tray-builder--get-description
+                       #'string>
                        arguments))
          (all-items
           (seq-reduce (lambda (acc it)
-                        (let* ((descr (car (split-string (cadr
-                                                          it)
+                        (let* ((description (tray-builder--get-description
+                                             it))
+                               (descr (car (split-string description
                                                          "-" t)))
                                (prev (car acc))
                                (prev-str (and (listp prev)
                                               (cadr prev)
                                               (car (split-string
-                                                    (cadr
+                                                    (tray-builder--get-description
                                                      prev)
                                                     "-" t))))
                                (enabled (and prev-str
@@ -1509,12 +1587,18 @@ of items."
                           (if (not enabled)
                               (progn
                                 (setq acc (push it acc)))
-                            (let ((prevs (seq-take-while #'listp
-                                                         acc)))
-                              (when (length> prevs 0)
+                            (let* ((prevs (seq-take-while #'listp
+                                                          acc))
+                                   (longest-pref (tray-builder-find-longest-prefix
+                                                  (mapcar
+                                                   #'tray-builder--get-description
+                                                   prevs))))
+                              (when (length> prevs 1)
+                                (when longest-pref
+                                  (setq prev-str longest-pref))
                                 (mapc
-                                 (lambda (it)
-                                   (let* ((tail (cdr it))
+                                 (lambda (pit)
+                                   (let* ((tail (cdr pit))
                                           (str
                                            (replace-regexp-in-string
                                             "^[-]+"
@@ -1524,14 +1608,17 @@ of items."
                                               tail)
                                              (length
                                               prev-str)))))
-                                     (setcdr it
-                                             (list (if (string-empty-p
-                                                        str)
+                                     (setcdr pit
+                                             (list (if (string-empty-p str)
                                                        (car tail)
                                                      str)
                                                    (cadr tail)))))
                                  prevs)
-                                (setq acc (push prev-str acc))))
+                                (setq acc
+                                      (push
+                                       (replace-regexp-in-string "-$" ""
+                                                                 prev-str)
+                                       acc))))
                             (setq acc (push "" acc))
                             (setq acc (push it acc)))))
                       items '()))
@@ -1569,6 +1656,7 @@ are to be extracted."
           ((guard curr)
            (setq stack (append stack curr))))))
     res))
+
 
 ;;;###autoload (autoload 'tray-builder-dwim "tray-builder" nil t)
 (transient-define-prefix tray-builder-dwim ()
@@ -1614,8 +1702,7 @@ are to be extracted."
              (eq v 'tray-builder-dwim))
            (delete-dups
             (append
-             (tray-builder-keymap-to-alist
-              (current-local-map))
+             (tray-builder--get-filtered-dwim-map)
              (list (cons "?"
                          'describe-mode))))))
          (conflicting-cmds (seq-filter
