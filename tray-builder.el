@@ -1507,6 +1507,36 @@ Argument MODES is a list of mode symbols to map to prefixes."
                                    enabled))
                             (tray-builder-minor-modes))))
 
+
+
+(defun tray-builder-get-region-map-alist ()
+  "Return an alist of key descriptions and their corresponding commands."
+  (when-let ((map (get-text-property (point) 'keymap)))
+    (when (keymapp map)
+      (let ((result))
+        (map-keymap (lambda (key value)
+                      (let* ((key-descr
+                              (pcase key
+                                ((pred (vectorp))
+                                 (key-description key))
+                                ((pred (integerp))
+                                 (key-description (char-to-string key)))
+                                (_
+                                 (key-description (vector key)))))
+                             (doc-str (concat "Execute " key-descr "."))
+                             (cmd (if (commandp value)
+                                      value
+                                    (lambda ()
+                                      (interactive)
+                                      doc-str
+                                      (execute-kbd-macro key-descr)))))
+                        (when cmd
+                          (push
+                           (cons key-descr cmd)
+                           result))))
+                    map)
+        (nreverse result)))))
+
 (defun tray-builder--get-filtered-dwim-map ()
   "Return a filtered keymap alist by comparing local and common modes."
   (let* ((buff (current-buffer))
@@ -1531,7 +1561,8 @@ Argument MODES is a list of mode symbols to map to prefixes."
                          (cdr (assq m minor-mode-map-alist))
                          filter)))
         (setq res (append res alist))))
-    (append (tray-builder-keymap-to-alist curr-map
+    (append (tray-builder-get-region-map-alist)
+            (tray-builder-keymap-to-alist curr-map
                                           (lambda (key cmd)
                                             (with-current-buffer buff
                                               (let ((found (where-is-internal
