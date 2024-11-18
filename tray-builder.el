@@ -104,7 +104,7 @@ actions."
      (propertize
       (or
        description
-       (when-let ((doc (replace-regexp-in-string
+       (when-let* ((doc (replace-regexp-in-string
                         "-" " " (capitalize (symbol-name
                                              mode)))))
          (replace-regexp-in-string "\\.$" ""
@@ -397,7 +397,7 @@ Argument KEYMAP is the keymap to convert to an alist.
 Optional argument SYMB-PREFIX is a symbol or string used as a prefix to filter
 KEYMAP entries."
   (when (keymapp keymap)
-    (if-let ((name
+    (if-let* ((name
               (when symb-prefix
                 (car
                  (split-string (if (symbolp symb-prefix)
@@ -431,13 +431,13 @@ Argument FN is a function to be called that moves the point.
 Optional argument N is the number of times to call FN; it defaults to 1."
   (unless n (setq n 1))
   (let ((parse-sexp-ignore-comments t))
-    (when-let ((str-start (nth 8 (syntax-ppss (point)))))
+    (when-let* ((str-start (nth 8 (syntax-ppss (point)))))
       (goto-char str-start))
     (let ((init-pos (point))
           (pos)
           (count n))
       (while (and (not (= count 0))
-                  (when-let ((end (ignore-errors
+                  (when-let* ((end (ignore-errors
                                     (funcall fn)
                                     (point))))
                     (unless (= end (or pos init-pos))
@@ -751,7 +751,7 @@ Argument NAME is a string to be converted to documentation text."
 Argument STRINGS is a list of strings to find the longest common prefix."
   (setq strings (seq-sort-by #'length '> strings))
   (seq-reduce (lambda (acc it)
-                (if-let ((shared (tray-builder-shared-start acc it)))
+                (if-let* ((shared (tray-builder-shared-start acc it)))
                     (setq acc shared)
                   acc))
               strings (pop strings)))
@@ -774,7 +774,7 @@ generate keys for COMMANDS automatically."
           (remove nil
                   (mapcar
                    (lambda (it)
-                     (when-let ((symb
+                     (when-let* ((symb
                                  (pcase it
                                    ((pred (symbolp))
                                     it)
@@ -796,7 +796,7 @@ generate keys for COMMANDS automatically."
                                                       (cdr line))))))
                   (key (if (and (stringp (car-safe line))
                                 (key-valid-p (car line)))
-                           (when-let ((short
+                           (when-let* ((short
                                        (if generate-keys
                                            (tray-builder-shorten-key-description
                                             (car
@@ -949,10 +949,10 @@ Argument LINE-STRING is a string representing a line to be parsed."
                                                   (length
                                                    line-string)))
                       line-string))
-  (when-let ((parts (split-string
-                     (substring-no-properties
-                      line-string)
-                     nil t)))
+  (when-let* ((parts (split-string
+                      (substring-no-properties
+                       line-string)
+                      nil t)))
     (let* ((key (seq-find (lambda (it)
                             (and (key-valid-p it)
                                  (not (member it '("C-c" "C-x")))))
@@ -985,7 +985,7 @@ Argument LINE-STRING is a string representing a line to be parsed."
                           (downcase it)
                         it))
                     parts "\s")))
-               (when-let ((rest (remove fn (remove key parts))))
+               (when-let* ((rest (remove fn (remove key parts))))
                  (string-join rest " "))
                fn))))
       (when symb
@@ -1146,14 +1146,14 @@ binding is shadowed by another map.
 
 Optional argument BUFFER is the buffer in which the keymap is active; defaults
 to the current buffer."
-  (when-let ((value
-              (cond ((keymapp sym)
-                     sym)
-                    ((stringp sym)
-                     (ignore-errors (symbol-value (intern-soft sym))))
-                    ((symbolp sym)
-                     (symbol-value sym))))
-             (buff (or buffer (current-buffer))))
+  (when-let* ((value
+               (cond ((keymapp sym)
+                      sym)
+                     ((stringp sym)
+                      (ignore-errors (symbol-value (intern-soft sym))))
+                     ((symbolp sym)
+                      (symbol-value sym))))
+              (buff (or buffer (current-buffer))))
     (with-temp-buffer
       (funcall (with-no-warnings
                  (if (fboundp 'help--describe-map-tree)
@@ -1259,11 +1259,11 @@ Optional argument FILTER is a predicate function to determine which keymaps to
 include."
   (let (maps)
     (mapatoms (lambda (sym)
-                (when-let ((value (and (boundp sym)
-                                       (keymapp (symbol-value
-                                                 sym))
-                                       (tray-builder-keymap-to-alist
-                                        sym))))
+                (when-let* ((value (and (boundp sym)
+                                        (keymapp (symbol-value
+                                                  sym))
+                                        (tray-builder-keymap-to-alist
+                                         sym))))
                   (when (or (not filter)
                             (funcall filter value))
                     (push (cons sym value) maps)))))
@@ -1286,8 +1286,8 @@ ACTIVE minor modes. If nil, all minor modes are included."
                      (lambda (it)
                        (when (or (not active)
                                  (memq (car it) active-modes))
-                         (when-let ((val (tray-builder-format-keymap-to-alist
-                                          (cdr it))))
+                         (when-let* ((val (tray-builder-format-keymap-to-alist
+                                           (cdr it))))
                            (apply #'vector
                                   :description (capitalize
                                                 (symbol-name (car it)))
@@ -1315,8 +1315,8 @@ Argument COMMANDS is a list of command symbols to be processed."
                                                           (commandp sym)
                                                           (push sym maps))))
                                          maps)))))
-  (if-let ((commands (tray-builder-commands-alist-to-transient
-                      commands)))
+  (if-let* ((commands (tray-builder-commands-alist-to-transient
+                       commands)))
       (progn (kill-new (tray-builder-prettify-vectors commands))
              (message "Copied"))
     (message "Couldn't extract commands")))
@@ -1336,7 +1336,7 @@ Argument KEYMAP is a symbol representing the keymap to extract commands from."
                                                             sym))
                                                   (push sym maps))))
                                  maps))))))
-  (if-let ((commands (reverse (tray-builder-commands-alist-to-transient
+  (if-let* ((commands (reverse (tray-builder-commands-alist-to-transient
                                (tray-builder-format-keymap-to-alist keymap)
                                (yes-or-no-p "Use short descriptions?")))))
       (progn (kill-new (tray-builder-prettify-vectors commands))
@@ -1394,7 +1394,7 @@ from."
   (when (proper-list-p item)
     (if (stringp (nth 1 item))
         (nth 1 item)
-      (when-let ((d (car (seq-drop
+      (when-let* ((d (car (seq-drop
                           (memq
                            :description
                            item)
@@ -1511,7 +1511,7 @@ Argument MODES is a list of mode symbols to map to prefixes."
 
 (defun tray-builder-get-region-map-alist ()
   "Return an alist of key descriptions and their corresponding commands."
-  (when-let ((map (get-text-property (point) 'keymap)))
+  (when-let* ((map (get-text-property (point) 'keymap)))
     (when (keymapp map)
       (let ((result))
         (map-keymap (lambda (key value)
@@ -1557,7 +1557,7 @@ Argument MODES is a list of mode symbols to map to prefixes."
                                     (mapcar #'key-description found)))))))
          (res))
     (dolist (m (seq-difference local-modes common-modes))
-      (when-let ((alist (tray-builder-keymap-to-alist
+      (when-let* ((alist (tray-builder-keymap-to-alist
                          (cdr (assq m minor-mode-map-alist))
                          filter)))
         (setq res (append res alist))))
@@ -1807,7 +1807,7 @@ Argument BODY is a list of forms that define the transient command."
     tray-builder-kill-from-minor-modes)]
   (interactive)
   (transient-setup #'tray-builder-menu)
-  (when-let ((string-result
+  (when-let* ((string-result
               (when (region-active-p)
                 (tray-builder--from-region
                  (region-beginning)
@@ -1865,7 +1865,7 @@ Argument SYM is a symbol whose value is to be toggled."
                                (let ((parse-sexp-ignore-comments
                                       t)
                                      (pos (point)))
-                                 (when-let ((str-start
+                                 (when-let* ((str-start
                                              (nth 8
                                                   (syntax-ppss
                                                    (point)))))
@@ -1880,7 +1880,7 @@ Argument SYM is a symbol whose value is to be toggled."
           (initial-input))
       (mapatoms
        (lambda (s)
-         (if-let ((ctype
+         (if-let* ((ctype
                    (and
                     (symbolp
                      s)
@@ -2023,7 +2023,7 @@ Optional argument ALIGN is the column to align the toggle's description."
     (setq len (tray-builder--first-column-children-len suffixes))
     (pcase-dolist (`(,cmd . ,pl)
                    suffixes)
-      (if-let ((key (plist-get pl :key)))
+      (if-let* ((key (plist-get pl :key)))
           (push key used-keys)
         (push (cons cmd pl) cmds)))
     (setq generated (tray-builder-generate-shortcuts cmds (lambda (it)
