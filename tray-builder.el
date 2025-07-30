@@ -950,9 +950,9 @@ Argument LINE-STRING is a string representing a line to be parsed."
                                                    line-string)))
                       line-string))
   (when-let* ((parts (split-string
-                     (substring-no-properties
-                      line-string)
-                     nil t)))
+                      (substring-no-properties
+                       line-string)
+                      nil t)))
     (let* ((key (seq-find (lambda (it)
                             (and (key-valid-p it)
                                  (not (member it '("C-c" "C-x")))))
@@ -1147,13 +1147,13 @@ binding is shadowed by another map.
 Optional argument BUFFER is the buffer in which the keymap is active; defaults
 to the current buffer."
   (when-let* ((value
-              (cond ((keymapp sym)
-                     sym)
-                    ((stringp sym)
-                     (ignore-errors (symbol-value (intern-soft sym))))
-                    ((symbolp sym)
-                     (symbol-value sym))))
-             (buff (or buffer (current-buffer))))
+               (cond ((keymapp sym)
+                      sym)
+                     ((stringp sym)
+                      (ignore-errors (symbol-value (intern-soft sym))))
+                     ((symbolp sym)
+                      (symbol-value sym))))
+              (buff (or buffer (current-buffer))))
     (with-temp-buffer
       (funcall (with-no-warnings
                  (if (fboundp 'help--describe-map-tree)
@@ -1260,10 +1260,10 @@ include."
   (let (maps)
     (mapatoms (lambda (sym)
                 (when-let* ((value (and (boundp sym)
-                                       (keymapp (symbol-value
-                                                 sym))
-                                       (tray-builder-keymap-to-alist
-                                        sym))))
+                                        (keymapp (symbol-value
+                                                  sym))
+                                        (tray-builder-keymap-to-alist
+                                         sym))))
                   (when (or (not filter)
                             (funcall filter value))
                     (push (cons sym value) maps)))))
@@ -1287,7 +1287,7 @@ ACTIVE minor modes. If nil, all minor modes are included."
                        (when (or (not active)
                                  (memq (car it) active-modes))
                          (when-let* ((val (tray-builder-format-keymap-to-alist
-                                          (cdr it))))
+                                           (cdr it))))
                            (apply #'vector
                                   :description (capitalize
                                                 (symbol-name (car it)))
@@ -1316,7 +1316,7 @@ Argument COMMANDS is a list of command symbols to be processed."
                                                           (push sym maps))))
                                          maps)))))
   (if-let* ((commands (tray-builder-commands-alist-to-transient
-                      commands)))
+                       commands)))
       (progn (kill-new (tray-builder-prettify-vectors commands))
              (message "Copied"))
     (message "Couldn't extract commands")))
