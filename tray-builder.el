@@ -1673,11 +1673,16 @@ of items."
 Argument LAYOUT is a list structure representing the key layout from which keys
 are to be extracted."
   (let ((res)
-        (stack layout))
+        (stack (if (vectorp layout)
+                   (append layout nil)
+                 layout)))
     (while stack
       (let ((curr (pop stack))
             (key))
         (pcase curr
+          (:key
+           (when-let* ((key (pop stack)))
+             (push key res)))
           ((pred (vectorp))
            (push (append curr nil) stack))
           ((pred (not (listp)))
