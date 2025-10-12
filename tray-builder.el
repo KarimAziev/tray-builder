@@ -100,26 +100,29 @@ actions."
 (defun tray-builder--make-toggled-description (mode &optional description align)
   "Concat DESCRIPTION for MODE with colorized suffixes ON-LABEL and OFF-LABEL."
   (lambda ()
-    (concat
-     (propertize
-      (or
-       description
-       (when-let* ((doc (replace-regexp-in-string
-                        "-" " " (capitalize (symbol-name
-                                             mode)))))
-         (replace-regexp-in-string "\\.$" ""
-                                   (car
-                                    (split-string doc "\n" nil)))))
-      'face
-      (if
-          (and (boundp mode)
-               (symbol-value mode))
-          'success nil))
-     (propertize " " 'display
-                 (list 'space :align-to (or align 32)))
-     (if (and (boundp mode)
-              (symbol-value mode))
-         "[X]" "[ ]"))))
+    (let ((active
+           (cond ;; ((functionp mode)
+            ;;  (funcall mode))
+            ((listp mode)
+             (eval mode))
+            ((and
+              (boundp mode))
+             (symbol-value mode)))))
+      (concat
+       (propertize
+        (or
+         description
+         (when-let* ((doc (replace-regexp-in-string
+                           "-" " " (capitalize (symbol-name
+                                                mode)))))
+           (replace-regexp-in-string "\\.$" ""
+                                     (car
+                                      (split-string doc "\n" nil)))))
+        'face
+        (when active 'success))
+       (propertize " " 'display
+                   (list 'space :align-to (or align 32)))
+       (if active "[X]" "[ ]")))))
 
 (defcustom tray-builder-align-toggle-num 35
   "Number of spaces for alignment in tray builder toggles.
@@ -176,7 +179,9 @@ or personal preference for the appearance of the tray builder's toggle display."
                                           (fido-mode :key "F")
                                           (fido-vertical-mode :key "V")
                                           (ivy-mode :key "i")
-                                          (counsel-mode :if-feature (counsel))
+                                          (counsel-mode
+                                           :key "c"
+                                           :if-feature (counsel))
                                           (vertico-mode :if-feature (vertico))
                                           (auto-fill-mode
                                            :description
@@ -231,6 +236,10 @@ or personal preference for the appearance of the tray builder's toggle display."
                                                             'yaml-ts-mode
                                                             'json-ts-mode
                                                             'c++-ts-mode)))
+                                          (copilot-mode
+                                           :if-feature (copilot)
+                                           :description
+                                           "GitHub Copilot")
                                           (helm-mode :if-feature (helm))
                                           (org-toggle-inline-images
                                            :if-derived
@@ -288,7 +297,9 @@ its associated properties for customization."
       ((const
         :format "%v "
         :variable-indicator)
-       (variable))
+       (radio
+        (variable)
+        (sexp)))
       ((const
         :format "%v "
         :if-require)
