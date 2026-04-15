@@ -1870,9 +1870,9 @@ Argument SYM is a symbol whose value is to be toggled."
                                   (pcase sexp
                                     (`(defcustom
                                         ,(and (pred (symbolp))
-                                              symb-name
-                                              (guard
-                                               (not (memq symb-name '(t nil)))))
+                                          symb-name
+                                          (guard
+                                           (not (memq symb-name '(t nil)))))
                                         ,(or 't 'nil)
                                         ,(pred (stringp))
                                         . ,_pl)
@@ -1882,9 +1882,9 @@ Argument SYM is a symbol whose value is to be toggled."
                                       t)
                                      (pos (point)))
                                  (when-let* ((str-start
-                                             (nth 8
-                                                  (syntax-ppss
-                                                   (point)))))
+                                              (nth 8
+                                                   (syntax-ppss
+                                                    (point)))))
                                    (goto-char str-start))
                                  (condition-case nil
                                      (progn
@@ -1897,30 +1897,27 @@ Argument SYM is a symbol whose value is to be toggled."
       (mapatoms
        (lambda (s)
          (if-let* ((ctype
-                   (and
-                    (symbolp
-                     s)
-                    (ignore-errors
-                      (get s 'custom-type)))))
-             (pcase ctype
-               ('boolean
-                (when (eq curr-sym s)
-                  (setq initial-input (symbol-name curr-sym)))
-                (push
-                 (list s
-                       (get s 'variable-documentation)
-                       (symbol-value s))
-                 vals))
-               ((guard (string-match-p "-debug$" (symbol-name s)))
-                (push
-                 (list s
-                       (get s 'variable-documentation)
-                       (symbol-value s))
-                 vals)))
+                    (and (symbolp s)
+                         (ignore-errors
+                           (get s 'custom-type)))))
+             (let ((val (ignore-errors (symbol-value s))))
+               (pcase ctype
+                 ('boolean
+                  (when (eq curr-sym s)
+                    (setq initial-input (symbol-name curr-sym)))
+                  (push
+                   (list s (get s 'variable-documentation) val)
+                   vals))
+                 ((guard (string-match-p "-debug$" (symbol-name s)))
+                  (push
+                   (list s
+                         (get s 'variable-documentation)
+                         val)
+                   vals))))
            (when (and (symbolp s)
                       (boundp s)
                       (string-match-p "-debug$" (symbol-name s)))
-             (let ((value (symbol-value s)))
+             (let ((value (ignore-errors (symbol-value s))))
                (when (or (eq value t)
                          (not value))
                  (push
@@ -1943,7 +1940,7 @@ Argument SYM is a symbol whose value is to be toggled."
                            (mapcar
                             (pcase-lambda
                               (`(,k .
-                                    ,_))
+                                 ,_))
                               (substring-no-properties
                                (symbol-name
                                 k)))
@@ -1957,7 +1954,7 @@ Argument SYM is a symbol whose value is to be toggled."
                              (cdr (assq (intern str) alist))))
                          (concat
                           (propertize " " 'display `(space :align-to
-                                                           ,(1+ len)))
+                                                     ,(1+ len)))
                           (if value "[X]" "[ ]")
                           " "
                           (truncate-string-to-width
@@ -1978,7 +1975,7 @@ Argument SYM is a symbol whose value is to be toggled."
                             (if (eq action 'metadata)
                                 `(metadata
                                   (annotation-function .
-                                                       ,annotf))
+                                   ,annotf))
                               (complete-with-action action
                                                     strs str
                                                     pred)))
@@ -2005,6 +2002,16 @@ Optional argument ALIGN is the column to align the toggle's description."
                           description
                           align)))
 
+
+(defun tray-builder--feature-p (sym)
+  "Check if SYM or its -autoloads variant is a loaded feature.
+
+Argument SYM is a symbol naming a feature to test with `featurep'."
+  (or (featurep sym)
+      (let ((name (symbol-name sym)))
+        (unless (string-suffix-p "-autoloads" name)
+          (featurep (intern-soft (concat name "-autoloads")))))))
+
 (defun tray-builder--get-filtered-toggle-suffixes ()
   "Filter command suffixes based on requirements."
   (seq-filter
@@ -2014,11 +2021,8 @@ Optional argument ALIGN is the column to align the toggle's description."
        (and
         (or (not if-features)
             (if (listp if-features)
-                (not (seq-find (lambda (it)
-                                 (not
-                                  (featurep it)))
-                               if-features))
-              (featurep if-features)))
+                (seq-find #'tray-builder--feature-p if-features)
+              (tray-builder--feature-p if-features)))
         (or (not if-requires)
             (if (listp if-requires)
                 (not (seq-find (lambda (it)
